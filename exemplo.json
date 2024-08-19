@@ -42,7 +42,7 @@
         {
             "type": 1,
             "description": "Carga Minima 100VCa",
-            "duration": 0.0,
+            "duration": 2.0,
             "input_source": 1,
             "channels_setup": [
                 {
@@ -62,7 +62,7 @@
         {
             "type": 1,
             "description": "Carga Maxima 100VCa",
-            "duration": 0.0,
+            "duration": 3.0,
             "input_source": 1,
             "channels_setup": [
                 {

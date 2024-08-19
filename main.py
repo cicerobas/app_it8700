@@ -13,6 +13,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QGridLayout,
+    QTableWidget,
+    QTableWidgetItem,
 )
 
 from controllers.sat_controller import ElectronicLoadController
@@ -83,11 +85,30 @@ class MainWindow(QMainWindow):
         header_layout.addWidget(logo)
         header_layout.addLayout(info_panel)
 
+        # steps table
+        table_font = QFont()
+        table_font.setPointSize(14)
+        self.steps_table = QTableWidget()
+        self.steps_table.setMaximumWidth(540)
+        self.steps_table.setFont(table_font)
+        self.steps_table.setRowCount(0)
+        self.steps_table.setColumnCount(3)
+        self.steps_table.setHorizontalHeaderLabels(['Descrição', 'Tempo', 'Status'])
+        self.steps_table.setColumnWidth(0, 300)
+        self.steps_table.setColumnWidth(1, 100)
+        self.steps_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.steps_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.steps_table.setSelectionMode(QTableWidget.SingleSelection)
+        interface_layout = QHBoxLayout()
+        interface_layout.setAlignment(Qt.AlignLeft)
+        interface_layout.addWidget(self.steps_table)
+
         # main layout
         main_layout = QVBoxLayout()
         main_layout.setAlignment(Qt.AlignTop)
         main_layout.addLayout(header_layout)
-        
+        main_layout.addLayout(interface_layout)
+
         body = QWidget()
         body.setLayout(main_layout)
         self.setCentralWidget(body)
@@ -95,6 +116,14 @@ class MainWindow(QMainWindow):
     def update_test_info(self):
         self.group_value.setText(active_test.group)
         self.model_value.setText(active_test.model)
+        self.steps_table.setRowCount(0)
+        
+        for row, step in enumerate(active_test.steps):
+            self.steps_table.insertRow(row)
+            self.steps_table.setItem(row, 0, QTableWidgetItem(step.description))
+            self.steps_table.setItem(row, 1, QTableWidgetItem(str(step.duration)))
+            self.steps_table.setItem(row, 2, QTableWidgetItem('---'))
+        
 
     def open_test_file(self):
         global active_test
