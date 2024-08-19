@@ -35,9 +35,9 @@ class Test:
     group: str
     model: str
     customer: str
-    active_channels: list[ActiveChannel]
     input_type: str
     inputs: list[str]
+    active_channels: list[ActiveChannel]
     steps: list[Step]
 
     def __post_init__(self):

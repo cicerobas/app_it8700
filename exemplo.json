@@ -1,0 +1,103 @@
+{
+    "group": "G09999",
+    "model": "SCA12345",
+    "customer": "CEBRA",
+    "input_type": "CA",
+    "inputs": [
+        "100",
+        "110",
+        "253"
+    ],
+    "active_channels": [
+        {
+            "id": 3,
+            "helper_label": "VD +24"
+        },
+        {
+            "id": 4,
+            "helper_label": "VC +24"
+        }
+    ],
+    "steps": [
+        {
+            "type": 1,
+            "description": "Ajuste em 24.5V",
+            "duration": 0.0,
+            "input_source": 1,
+            "channels_setup": [
+                {
+                    "id": 3,
+                    "minVolt": 23.0,
+                    "maxVolt": 25.5,
+                    "load": 2.0
+                },
+                {
+                    "id": 4,
+                    "minVolt": 23.0,
+                    "maxVolt": 25.5,
+                    "load": 1.0
+                }
+            ]
+        },
+        {
+            "type": 1,
+            "description": "Carga Minima 100VCa",
+            "duration": 0.0,
+            "input_source": 1,
+            "channels_setup": [
+                {
+                    "id": 3,
+                    "minVolt": 23.0,
+                    "maxVolt": 25.5,
+                    "load": 0.0
+                },
+                {
+                    "id": 4,
+                    "minVolt": 23.0,
+                    "maxVolt": 25.5,
+                    "load": 0.0
+                }
+            ]
+        },
+        {
+            "type": 1,
+            "description": "Carga Maxima 100VCa",
+            "duration": 0.0,
+            "input_source": 1,
+            "channels_setup": [
+                {
+                    "id": 3,
+                    "minVolt": 23.0,
+                    "maxVolt": 25.5,
+                    "load": 3.0
+                },
+                {
+                    "id": 4,
+                    "minVolt": 23.0,
+                    "maxVolt": 25.5,
+                    "load": 3.0
+                }
+            ]
+        },
+        {
+            "type": 1,
+            "description": "Curto Amperimetro",
+            "duration": 0.0,
+            "input_source": 1,
+            "channels_setup": [
+                {
+                    "id": 3,
+                    "minVolt": 23.0,
+                    "maxVolt": 25.5,
+                    "load": 2.0
+                },
+                {
+                    "id": 4,
+                    "minVolt": 23.0,
+                    "maxVolt": 25.5,
+                    "load": 1.0
+                }
+            ]
+        }
+    ]
+}
