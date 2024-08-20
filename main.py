@@ -15,10 +15,12 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QTableWidget,
     QTableWidgetItem,
+    QGroupBox,
 )
 
 from controllers.sat_controller import ElectronicLoadController
 from models.test_file_model import Test
+from widgets.channel_monitor import ChannelMonitor
 
 active_test = None
 
@@ -30,6 +32,13 @@ def info_label(text: str) -> QLabel:
     label.setFont(font)
     return label
 
+
+def monitor_label(value: str, size: int, sfx: str) -> QLabel:
+    font = QFont()
+    font.setPointSize(size)
+    label = QLabel(f"{value} {sfx}")
+    label.setFont(font)
+    return label
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -89,11 +98,11 @@ class MainWindow(QMainWindow):
         table_font = QFont()
         table_font.setPointSize(14)
         self.steps_table = QTableWidget()
-        self.steps_table.setMaximumWidth(540)
+        self.steps_table.setMaximumWidth(520)
         self.steps_table.setFont(table_font)
         self.steps_table.setRowCount(0)
         self.steps_table.setColumnCount(3)
-        self.steps_table.setHorizontalHeaderLabels(['Descrição', 'Tempo', 'Status'])
+        self.steps_table.setHorizontalHeaderLabels(["Descrição", "Tempo", "Status"])
         self.steps_table.setColumnWidth(0, 300)
         self.steps_table.setColumnWidth(1, 100)
         self.steps_table.setEditTriggers(QTableWidget.NoEditTriggers)
@@ -102,6 +111,10 @@ class MainWindow(QMainWindow):
         interface_layout = QHBoxLayout()
         interface_layout.setAlignment(Qt.AlignLeft)
         interface_layout.addWidget(self.steps_table)
+        self.channels_layout = QVBoxLayout()
+        self.channels_layout.setAlignment(Qt.AlignRight | Qt.AlignTop)
+        self.channels_layout.setSpacing(20)
+        interface_layout.addLayout(self.channels_layout)
 
         # main layout
         main_layout = QVBoxLayout()
@@ -117,12 +130,15 @@ class MainWindow(QMainWindow):
         self.group_value.setText(active_test.group)
         self.model_value.setText(active_test.model)
         self.steps_table.setRowCount(0)
-        
+
         for row, step in enumerate(active_test.steps):
             self.steps_table.insertRow(row)
             self.steps_table.setItem(row, 0, QTableWidgetItem(step.description))
             self.steps_table.setItem(row, 1, QTableWidgetItem(str(step.duration)))
-            self.steps_table.setItem(row, 2, QTableWidgetItem('---'))
+            self.steps_table.setItem(row, 2, QTableWidgetItem("---"))
+
+        for channel in active_test.active_channels:
+            self.channels_layout.addWidget(ChannelMonitor(f"Canal {channel.id}"))
         
 
     def open_test_file(self):
