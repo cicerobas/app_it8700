@@ -20,23 +20,25 @@ from controllers.sat_controller import ElectronicLoadController
 from models.test_file_model import Test
 from widgets.channel_monitor import ChannelMonitor
 from widgets.steps_table import StepsTable
+from widgets.test_info_dialog import CustomDialog
 
-active_test = None
 
+class CurrentTestSetup():
+    active_test: Test = None
+    serial_number: str = None
+    operator_name: str = ""
+    is_running: bool = False
 
-def info_label(text: str) -> QLabel:
-    font = QFont()
-    font.setPointSize(16)
-    label = QLabel(text)
-    label.setFont(font)
-    return label
-
+    def increase_serial_number(self):
+        self.serial_number = self.serial_number + 1
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, test_setup: CurrentTestSetup):
         super().__init__()
+        self.test_setup = test_setup
         self.sat_controller = ElectronicLoadController()
-        self.setMinimumSize(QSize(800, 600))
+        
+        self.setMinimumSize(QSize(1000, 600))
         self.setWindowTitle(
             f"CEBRA - {self.sat_controller.inst_id}"
             if self.sat_controller.conn_status
@@ -85,6 +87,11 @@ class MainWindow(QMainWindow):
         header_layout = QHBoxLayout()
         header_layout.addWidget(logo)
         header_layout.addLayout(info_panel)
+        start_button = QPushButton("START") # teste
+        start_button.setFixedWidth(100)
+        header_layout.addWidget(start_button, Qt.AlignmentFlag.AlignRight)
+    
+        start_button.clicked.connect(self.show_test_info_dialog)
 
         self.steps_table = StepsTable()
         self.body_layout = QHBoxLayout()
@@ -102,12 +109,25 @@ class MainWindow(QMainWindow):
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
 
-    def update_test_info(self):
-        self.group_value.setText(active_test.group)
-        self.model_value.setText(active_test.model)
-        self.steps_table.update_step_list(active_test.steps)
+    def show_test_info_dialog(self):
+        if self.test_setup.active_test is None:
+            return
         
-        for channel in active_test.active_channels:
+        dlg = CustomDialog(self)
+        if dlg.exec():
+            sn, name = dlg.get_values()
+            self.test_setup.serial_number = sn.zfill(8)
+            self.test_setup.operator_name = name
+            self.sn_value.setText(self.test_setup.serial_number)
+            self.operator_value.setText(self.test_setup.operator_name)
+
+
+    def update_test_info(self):
+        self.group_value.setText(self.test_setup.active_test.group)
+        self.model_value.setText(self.test_setup.active_test.model)
+        self.steps_table.update_step_list(self.test_setup.active_test.steps)
+        
+        for channel in self.test_setup.active_test.active_channels:
             self.channels_layout.addWidget(ChannelMonitor(f"Canal {channel.id}"))
 
         self.steps_table.resizeColumnsToContents()
@@ -117,7 +137,6 @@ class MainWindow(QMainWindow):
         
 
     def open_test_file(self):
-        global active_test
         fileName = QFileDialog.getOpenFileName(
             self, filter="*.json", caption="Abrir arquivo de teste..."
         )[0]
@@ -126,16 +145,22 @@ class MainWindow(QMainWindow):
             with open(fileName) as loaded_file:
                 test_data = json.load(loaded_file)
             try:
-                active_test = Test(**test_data)
+                self.test_setup.active_test = Test(**test_data)
             except:
                 print("ERRO, arquivo inválido!")
 
-        if active_test is not None:
+        if self.test_setup.active_test is not None:
             self.update_test_info()
 
+def info_label(text: str) -> QLabel:
+    font = QFont()
+    font.setPointSize(16)
+    label = QLabel(text)
+    label.setFont(font)
+    return label
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = MainWindow()
+    window = MainWindow(test_setup=CurrentTestSetup())
     window.showMaximized()  # .showFullScreen()
     sys.exit(app.exec())
