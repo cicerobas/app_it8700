@@ -13,14 +13,13 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QGridLayout,
-    QTableWidget,
-    QTableWidgetItem,
-    QGroupBox,
+    QSizePolicy
 )
 
 from controllers.sat_controller import ElectronicLoadController
 from models.test_file_model import Test
 from widgets.channel_monitor import ChannelMonitor
+from widgets.steps_table import StepsTable
 
 active_test = None
 
@@ -32,13 +31,6 @@ def info_label(text: str) -> QLabel:
     label.setFont(font)
     return label
 
-
-def monitor_label(value: str, size: int, sfx: str) -> QLabel:
-    font = QFont()
-    font.setPointSize(size)
-    label = QLabel(f"{value} {sfx}")
-    label.setFont(font)
-    return label
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -94,51 +86,34 @@ class MainWindow(QMainWindow):
         header_layout.addWidget(logo)
         header_layout.addLayout(info_panel)
 
-        # steps table
-        table_font = QFont()
-        table_font.setPointSize(14)
-        self.steps_table = QTableWidget()
-        self.steps_table.setMaximumWidth(520)
-        self.steps_table.setFont(table_font)
-        self.steps_table.setRowCount(0)
-        self.steps_table.setColumnCount(3)
-        self.steps_table.setHorizontalHeaderLabels(["Descrição", "Tempo", "Status"])
-        self.steps_table.setColumnWidth(0, 300)
-        self.steps_table.setColumnWidth(1, 100)
-        self.steps_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.steps_table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.steps_table.setSelectionMode(QTableWidget.SingleSelection)
-        interface_layout = QHBoxLayout()
-        interface_layout.setAlignment(Qt.AlignLeft)
-        interface_layout.addWidget(self.steps_table)
+        self.steps_table = StepsTable()
+        self.body_layout = QHBoxLayout()
         self.channels_layout = QVBoxLayout()
         self.channels_layout.setAlignment(Qt.AlignRight | Qt.AlignTop)
         self.channels_layout.setSpacing(20)
-        interface_layout.addLayout(self.channels_layout)
-
+        self.body_layout.addWidget(self.steps_table)
+        self.body_layout.addLayout(self.channels_layout)
         # main layout
         main_layout = QVBoxLayout()
         main_layout.setAlignment(Qt.AlignTop)
         main_layout.addLayout(header_layout)
-        main_layout.addLayout(interface_layout)
-
-        body = QWidget()
-        body.setLayout(main_layout)
-        self.setCentralWidget(body)
+        main_layout.addLayout(self.body_layout)
+        main_widget = QWidget()
+        main_widget.setLayout(main_layout)
+        self.setCentralWidget(main_widget)
 
     def update_test_info(self):
         self.group_value.setText(active_test.group)
         self.model_value.setText(active_test.model)
-        self.steps_table.setRowCount(0)
-
-        for row, step in enumerate(active_test.steps):
-            self.steps_table.insertRow(row)
-            self.steps_table.setItem(row, 0, QTableWidgetItem(step.description))
-            self.steps_table.setItem(row, 1, QTableWidgetItem(str(step.duration)))
-            self.steps_table.setItem(row, 2, QTableWidgetItem("---"))
-
+        self.steps_table.update_step_list(active_test.steps)
+        
         for channel in active_test.active_channels:
             self.channels_layout.addWidget(ChannelMonitor(f"Canal {channel.id}"))
+
+        self.steps_table.resizeColumnsToContents()
+        total_width = sum(self.steps_table.columnWidth(i) for i in range(self.steps_table.columnCount()))
+        self.steps_table.setFixedWidth(total_width+30)
+        self.steps_table.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
         
 
     def open_test_file(self):
