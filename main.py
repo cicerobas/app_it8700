@@ -2,7 +2,7 @@ import sys
 import json
 
 from PySide6.QtCore import QSize, Qt
-from PySide6.QtGui import QAction, QIcon, QPixmap, QFont
+from PySide6.QtGui import QAction, QIcon, QPixmap, QFont, QShortcut, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -45,14 +45,19 @@ class MainWindow(QMainWindow):
             else "CEBRA - IT8700 Sem Conexão"
         )
 
+        # Shortcuts
+        self.run_sequence = QShortcut(QKeySequence('Alt+R'), self)
+        self.run_sequence.activated.connect(self.run_test_sequence)
+
         # Actions
         open_file_action = QAction(
-            QIcon("assets/icons/file_open.png"), "Open File", self
+            QIcon("assets/icons/file_open.png"), "Abrir Arquivo", self
         )
         open_file_action.triggered.connect(self.open_test_file)
 
+        # Menu
         menu = self.menuBar()
-        file_menu = menu.addMenu("&File")
+        file_menu = menu.addMenu("&Arquivo")
         file_menu.addAction(open_file_action)
 
         logo = QLabel()
@@ -91,7 +96,7 @@ class MainWindow(QMainWindow):
         start_button.setFixedWidth(100)
         header_layout.addWidget(start_button, Qt.AlignmentFlag.AlignRight)
     
-        start_button.clicked.connect(self.show_test_info_dialog)
+        #start_button.clicked.connect(self.show_test_info_dialog)
 
         self.steps_table = StepsTable()
         self.body_layout = QHBoxLayout()
@@ -109,10 +114,16 @@ class MainWindow(QMainWindow):
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
 
-    def show_test_info_dialog(self):
-        if self.test_setup.active_test is None:
+    def run_test_sequence(self):
+        if self.test_setup.active_test is None  or self.test_setup.is_running:
             return
-        
+        if self.test_setup.serial_number is None or self.test_setup.operator_name is None:
+            if not self.show_test_info_dialog():
+                return
+            
+        print("RUNNING")
+
+    def show_test_info_dialog(self) -> bool:
         dlg = CustomDialog(self)
         if dlg.exec():
             sn, name = dlg.get_values()
@@ -120,6 +131,8 @@ class MainWindow(QMainWindow):
             self.test_setup.operator_name = name
             self.sn_value.setText(self.test_setup.serial_number)
             self.operator_value.setText(self.test_setup.operator_name)
+            return True
+        return False
 
 
     def update_test_info(self):
