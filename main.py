@@ -13,31 +13,36 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QGridLayout,
-    QSizePolicy
+    QSizePolicy,
 )
 
 from controllers.sat_controller import ElectronicLoadController
+from controllers.arduino_controller import ArduinoController
 from models.test_file_model import Test
 from widgets.channel_monitor import ChannelMonitor
 from widgets.steps_table import StepsTable
 from widgets.test_info_dialog import CustomDialog
 
 
-class CurrentTestSetup():
+class CurrentTestSetup:
     active_test: Test = None
     serial_number: str = None
     operator_name: str = ""
     is_running: bool = False
+    is_single_step: bool = False
+    selected_step_index: int = 0
+    active_input_source:int = 0
 
     def increase_serial_number(self):
         self.serial_number = self.serial_number + 1
+
 
 class MainWindow(QMainWindow):
     def __init__(self, test_setup: CurrentTestSetup):
         super().__init__()
         self.test_setup = test_setup
         self.sat_controller = ElectronicLoadController()
-        
+        self.arduino_controller = ArduinoController()
         self.setMinimumSize(QSize(1000, 600))
         self.setWindowTitle(
             f"CEBRA - {self.sat_controller.inst_id}"
@@ -46,7 +51,7 @@ class MainWindow(QMainWindow):
         )
 
         # Shortcuts
-        self.run_sequence = QShortcut(QKeySequence('Alt+R'), self)
+        self.run_sequence = QShortcut(QKeySequence("Alt+R"), self)
         self.run_sequence.activated.connect(self.run_test_sequence)
 
         # Actions
@@ -92,11 +97,11 @@ class MainWindow(QMainWindow):
         header_layout = QHBoxLayout()
         header_layout.addWidget(logo)
         header_layout.addLayout(info_panel)
-        start_button = QPushButton("START") # teste
+        start_button = QPushButton("START")  # teste
         start_button.setFixedWidth(100)
         header_layout.addWidget(start_button, Qt.AlignmentFlag.AlignRight)
-    
-        #start_button.clicked.connect(self.show_test_info_dialog)
+
+        # start_button.clicked.connect(self.show_test_info_dialog)
 
         self.steps_table = StepsTable()
         self.body_layout = QHBoxLayout()
@@ -105,6 +110,7 @@ class MainWindow(QMainWindow):
         self.channels_layout.setSpacing(20)
         self.body_layout.addWidget(self.steps_table)
         self.body_layout.addLayout(self.channels_layout)
+
         # main layout
         main_layout = QVBoxLayout()
         main_layout.setAlignment(Qt.AlignTop)
@@ -114,14 +120,60 @@ class MainWindow(QMainWindow):
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
 
+    def set_input_source(self, input_source: int) -> None:
+        """
+        Receives input_source(int) and send it to arduino_ctrl using the predefined pins configuration and input_type.
+            - Pin 4: CA1
+            - Pin 5: CA2
+            - Pin 6: CA3
+            - Pin 7: CC1
+            - Pin 8: CC2
+            - Pin 9: CC3
+            - Pin 10: Buzzer
+        No return.
+        """
+        if self.test_setup.active_input_source != input_source:
+            input_type = self.test_setup.active_test.input_type
+            match input_source:
+                case 1:
+                    self.arduino_controller.change_output("4" if input_type == "CA" else "7")
+                case 2:
+                    self.arduino_controller.change_output("5" if input_type == "CA" else "8")
+                case 3:
+                    self.arduino_controller.change_output("6" if input_type == "CA" else "9")
+            self.test_setup.active_input_source = input_source
+
     def run_test_sequence(self):
-        if self.test_setup.active_test is None  or self.test_setup.is_running:
+        if (
+            not self.sat_controller.conn_status
+            or not self.arduino_controller.check_connection()
+        ):
             return
-        if self.test_setup.serial_number is None or self.test_setup.operator_name is None:
+        if self.test_setup.active_test is None or self.test_setup.is_running:
+            return
+        if (
+            self.test_setup.serial_number is None
+            or self.test_setup.operator_name is None
+        ):
             if not self.show_test_info_dialog():
                 return
-            
-        print("RUNNING")
+        
+        #Start setup
+        self.test_setup.is_running = True
+
+        if self.test_setup.is_single_step:
+            step_list = [self.test_setup.active_test.steps[self.test_setup.selected_step_index]]
+        else:
+            step_list = self.test_setup.active_test.steps
+        
+        for index, step in enumerate(step_list):
+                step_done = False
+                while self.test_setup.is_running and not step_done:
+                    self.set_input_source(step.input)
+                    step_done = True
+
+        
+        self.arduino_controller.buzzer()
 
     def show_test_info_dialog(self) -> bool:
         dlg = CustomDialog(self)
@@ -134,20 +186,21 @@ class MainWindow(QMainWindow):
             return True
         return False
 
-
     def update_test_info(self):
         self.group_value.setText(self.test_setup.active_test.group)
         self.model_value.setText(self.test_setup.active_test.model)
         self.steps_table.update_step_list(self.test_setup.active_test.steps)
-        
+
         for channel in self.test_setup.active_test.active_channels:
             self.channels_layout.addWidget(ChannelMonitor(f"Canal {channel.id}"))
 
         self.steps_table.resizeColumnsToContents()
-        total_width = sum(self.steps_table.columnWidth(i) for i in range(self.steps_table.columnCount()))
-        self.steps_table.setFixedWidth(total_width+30)
+        total_width = sum(
+            self.steps_table.columnWidth(i)
+            for i in range(self.steps_table.columnCount())
+        )
+        self.steps_table.setFixedWidth(total_width + 30)
         self.steps_table.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
-        
 
     def open_test_file(self):
         fileName = QFileDialog.getOpenFileName(
@@ -165,12 +218,14 @@ class MainWindow(QMainWindow):
         if self.test_setup.active_test is not None:
             self.update_test_info()
 
+
 def info_label(text: str) -> QLabel:
     font = QFont()
     font.setPointSize(16)
     label = QLabel(text)
     label.setFont(font)
     return label
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
