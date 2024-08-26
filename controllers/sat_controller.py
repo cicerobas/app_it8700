@@ -5,6 +5,7 @@ from utils.scpi_commands import *
 # Default instrument path using a USB/RS-232 adapter.
 DEFAULT_INST_PATH = "ASRL/dev/ttyUSB0::INSTR"
 
+
 class ElectronicLoadController:
     def __init__(self):
         self.rm = pyvisa.ResourceManager()
@@ -21,6 +22,22 @@ class ElectronicLoadController:
             self.inst_id = id_response.strip()
             inst.write(SYSTEM_REMOTE)
             inst.write(CLEAR_STATUS)
+            inst.write(ALL_INPUTS_ON) #TESTE APENAS
             return inst
-        
+
         return None
+
+    def _sat_write(self, command: str) -> None:
+        self.inst_resource.write(command)
+
+    def _sat_query(self, command: str) -> str:
+        result = self.inst_resource.query(command)
+        return result
+
+    def set_active_channel(self, channel_id: int) -> None:
+        self._sat_write(f"{SELECT_CHANNEL}{channel_id}")
+
+    def get_channel_value(self, channel_id: int) -> str:
+        self.set_active_channel(channel_id)
+        result = self._sat_query(FETCH_VOLT)
+        return result

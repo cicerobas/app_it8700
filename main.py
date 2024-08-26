@@ -1,7 +1,20 @@
 import sys
 import json
+from time import sleep
 
-from PySide6.QtCore import QSize, Qt
+from PySide6.QtCore import (
+    QSize,
+    Qt,
+    QRunnable,
+    QThreadPool,
+    QMutex,
+    QWaitCondition,
+    QMutexLocker,
+    Signal,
+    Slot,
+    QObject,
+    QTimer,
+)
 from PySide6.QtGui import QAction, QIcon, QPixmap, QFont, QShortcut, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
@@ -28,13 +41,59 @@ class CurrentTestSetup:
     active_test: Test = None
     serial_number: str = None
     operator_name: str = ""
+    channels: list[ChannelMonitor] = []
     is_running: bool = False
     is_single_step: bool = False
     selected_step_index: int = 0
-    active_input_source:int = 0
+    active_input_source: int = 0
 
     def increase_serial_number(self):
         self.serial_number = self.serial_number + 1
+
+
+class MonitorWorker(QRunnable):
+    def __init__(
+        self,
+        channels: list[ChannelMonitor],
+        sat_controller: ElectronicLoadController,
+    ):
+        super().__init__()
+        self.channels = channels
+        self.sat_controller = sat_controller
+        self.mutex = QMutex()
+        self.wait_condition = QWaitCondition()
+        self.paused = False
+        self.running = True
+
+    def run(self):
+        while self.running:
+            self.mutex.lock()
+            while self.paused:
+                self.wait_condition.wait(
+                    self.mutex
+                )  # Pausa até que seja sinalizado para continuar
+            self.mutex.unlock()
+
+            for channel in self.channels:
+                channel.update_output(
+                    self.sat_controller.get_channel_value(channel.channel_id)
+                )
+                sleep(0.1)
+
+    def pause(self):
+        with QMutexLocker(self.mutex):
+            self.paused = True
+
+    def resume(self):
+        with QMutexLocker(self.mutex):
+            self.paused = False
+            self.wait_condition.wakeAll()  # Notifica a thread para continuar
+
+    def stop(self):
+        with QMutexLocker(self.mutex):
+            self.running = False
+            self.paused = False
+            self.wait_condition.wakeAll()  # Garante que a thread saia do estado de pausa
 
 
 class MainWindow(QMainWindow):
@@ -43,6 +102,9 @@ class MainWindow(QMainWindow):
         self.test_setup = test_setup
         self.sat_controller = ElectronicLoadController()
         self.arduino_controller = ArduinoController()
+        self.thread_pool = QThreadPool()
+        self.monitoring_worker = None
+
         self.setMinimumSize(QSize(1000, 600))
         self.setWindowTitle(
             f"CEBRA - {self.sat_controller.inst_id}"
@@ -97,11 +159,6 @@ class MainWindow(QMainWindow):
         header_layout = QHBoxLayout()
         header_layout.addWidget(logo)
         header_layout.addLayout(info_panel)
-        start_button = QPushButton("START")  # teste
-        start_button.setFixedWidth(100)
-        header_layout.addWidget(start_button, Qt.AlignmentFlag.AlignRight)
-
-        # start_button.clicked.connect(self.show_test_info_dialog)
 
         self.steps_table = StepsTable()
         self.body_layout = QHBoxLayout()
@@ -136,12 +193,27 @@ class MainWindow(QMainWindow):
             input_type = self.test_setup.active_test.input_type
             match input_source:
                 case 1:
-                    self.arduino_controller.change_output("4" if input_type == "CA" else "7")
+                    self.arduino_controller.change_output(
+                        "4" if input_type == "CA" else "7"
+                    )
                 case 2:
-                    self.arduino_controller.change_output("5" if input_type == "CA" else "8")
+                    self.arduino_controller.change_output(
+                        "5" if input_type == "CA" else "8"
+                    )
                 case 3:
-                    self.arduino_controller.change_output("6" if input_type == "CA" else "9")
+                    self.arduino_controller.change_output(
+                        "6" if input_type == "CA" else "9"
+                    )
             self.test_setup.active_input_source = input_source
+
+    @Slot()
+    def start_monitoring(self):
+        print("Monitorando...")
+        if self.monitoring_worker is None:
+            self.monitoring_worker = MonitorWorker(
+                self.test_setup.channels, self.sat_controller
+            )
+            self.thread_pool.start(self.monitoring_worker)
 
     def run_test_sequence(self):
         if (
@@ -157,22 +229,24 @@ class MainWindow(QMainWindow):
         ):
             if not self.show_test_info_dialog():
                 return
-        
-        #Start setup
+
+        # Start setup
         self.test_setup.is_running = True
+        self.start_monitoring()
 
         if self.test_setup.is_single_step:
-            step_list = [self.test_setup.active_test.steps[self.test_setup.selected_step_index]]
+            step_list = [
+                self.test_setup.active_test.steps[self.test_setup.selected_step_index]
+            ]
         else:
             step_list = self.test_setup.active_test.steps
-        
-        for index, step in enumerate(step_list):
-                step_done = False
-                while self.test_setup.is_running and not step_done:
-                    self.set_input_source(step.input)
-                    step_done = True
 
-        
+        for index, step in enumerate(step_list):
+            step_done = False
+            while self.test_setup.is_running and not step_done:
+                self.set_input_source(step.input)
+                step_done = True
+
         self.arduino_controller.buzzer()
 
     def show_test_info_dialog(self) -> bool:
@@ -192,7 +266,9 @@ class MainWindow(QMainWindow):
         self.steps_table.update_step_list(self.test_setup.active_test.steps)
 
         for channel in self.test_setup.active_test.active_channels:
-            self.channels_layout.addWidget(ChannelMonitor(f"Canal {channel.id}"))
+            channel_monitor = ChannelMonitor(channel.id)
+            self.test_setup.channels.append(channel_monitor)
+            self.channels_layout.addWidget(channel_monitor)
 
         self.steps_table.resizeColumnsToContents()
         total_width = sum(

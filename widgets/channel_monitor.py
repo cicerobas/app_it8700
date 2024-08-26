@@ -4,9 +4,10 @@ from PySide6.QtGui import QFont
 
 
 class ChannelMonitor(QGroupBox):
-    def __init__(self, title: str):
+    def __init__(self, channel: int):
         super().__init__()
-        self.setTitle(title)
+        self.channel_id = channel
+        self.setTitle(f"Canal {self.channel_id}")
         self.setFixedSize(QSize(500, 150))
         self.setStyleSheet(
             "QGroupBox { border: 2px solid gray; border-radius: 5px; padding: 10px; }"
@@ -61,11 +62,17 @@ class ChannelMonitor(QGroupBox):
 
         h_layout.addLayout(grid_layout)
 
-    def update_fixed_values(self, values:list[str]) -> None:
+    def update_fixed_values(self, values: list[str]) -> None:
         # values = ['Vmax', 'Vmin', 'Load']
-        self.vmax_value.setText(f'{values[0]} V')
-        self.vmin_value.setText(f'{values[1]} V')
-        self.load_value.setText(f'{values[2]} A')
+        self.vmax_value.setText(f"{values[0]} V")
+        self.vmin_value.setText(f"{values[1]} V")
+        self.load_value.setText(f"{values[2]} A")
+
+    def update_output(self, value: str):
+        value = float(value)
+        self.v_output_value.setText(
+            f'{str(float("%.3f" % value) if value < 10 else "%.2f" % value)} V'
+        )
 
 
 def defaut_value_field() -> QLabel:
