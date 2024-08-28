@@ -21,221 +21,61 @@
     "steps": [
         {
             "type": 1,
-            "description": "Ajuste em 24.5V",
+            "description": "Sem Carga",
+            "duration": 5.0,
+            "input_source": 1,
+            "channels_setup": [
+                {
+                    "id": 3,
+                    "minVolt": 1.0,
+                    "maxVolt": 30.0,
+                    "load": 0.3
+                },
+                {
+                    "id": 4,
+                    "minVolt": 1.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                }
+            ]
+        },
+        {
+            "type": 1,
+            "description": "Ajuste / Carga Média",
             "duration": 0.0,
             "input_source": 1,
             "channels_setup": [
                 {
                     "id": 3,
-                    "minVolt": 23.0,
-                    "maxVolt": 25.5,
-                    "load": 2.0
+                    "minVolt": 1.0,
+                    "maxVolt": 30.0,
+                    "load": 0.5
                 },
                 {
                     "id": 4,
-                    "minVolt": 23.0,
-                    "maxVolt": 25.5,
-                    "load": 1.0
+                    "minVolt": 1.0,
+                    "maxVolt": 30.0,
+                    "load": 0.8
                 }
             ]
         },
         {
             "type": 1,
-            "description": "Carga Minima 100VCa",
-            "duration": 2.0,
-            "input_source": 1,
-            "channels_setup": [
-                {
-                    "id": 3,
-                    "minVolt": 23.0,
-                    "maxVolt": 25.5,
-                    "load": 0.0
-                },
-                {
-                    "id": 4,
-                    "minVolt": 23.0,
-                    "maxVolt": 25.5,
-                    "load": 0.0
-                }
-            ]
-        },
-        {
-            "type": 1,
-            "description": "Carga Maxima 100VCa - Ver Led",
+            "description": "Carga Maxima",
             "duration": 3.0,
-            "input_source": 1,
+            "input_source": 2,
             "channels_setup": [
                 {
                     "id": 3,
-                    "minVolt": 23.0,
-                    "maxVolt": 25.5,
-                    "load": 3.0
-                },
-                {
-                    "id": 4,
-                    "minVolt": 23.0,
-                    "maxVolt": 25.5,
-                    "load": 3.0
-                }
-            ]
-        },
-        {
-            "type": 1,
-            "description": "Curto Amperimetro",
-            "duration": 0.0,
-            "input_source": 1,
-            "channels_setup": [
-                {
-                    "id": 3,
-                    "minVolt": 23.0,
-                    "maxVolt": 25.5,
-                    "load": 2.0
-                },
-                {
-                    "id": 4,
-                    "minVolt": 23.0,
-                    "maxVolt": 25.5,
+                    "minVolt": 1.0,
+                    "maxVolt": 30.0,
                     "load": 1.0
-                }
-            ]
-        },
-        {
-            "type": 1,
-            "description": "Curto Amperimetro",
-            "duration": 0.0,
-            "input_source": 1,
-            "channels_setup": [
-                {
-                    "id": 3,
-                    "minVolt": 23.0,
-                    "maxVolt": 25.5,
-                    "load": 2.0
                 },
                 {
                     "id": 4,
-                    "minVolt": 23.0,
-                    "maxVolt": 25.5,
-                    "load": 1.0
-                }
-            ]
-        },
-        {
-            "type": 1,
-            "description": "Curto Amperimetro",
-            "duration": 0.0,
-            "input_source": 1,
-            "channels_setup": [
-                {
-                    "id": 3,
-                    "minVolt": 23.0,
-                    "maxVolt": 25.5,
-                    "load": 2.0
-                },
-                {
-                    "id": 4,
-                    "minVolt": 23.0,
-                    "maxVolt": 25.5,
-                    "load": 1.0
-                }
-            ]
-        },
-        {
-            "type": 1,
-            "description": "Curto Amperimetro",
-            "duration": 0.0,
-            "input_source": 1,
-            "channels_setup": [
-                {
-                    "id": 3,
-                    "minVolt": 23.0,
-                    "maxVolt": 25.5,
-                    "load": 2.0
-                },
-                {
-                    "id": 4,
-                    "minVolt": 23.0,
-                    "maxVolt": 25.5,
-                    "load": 1.0
-                }
-            ]
-        },
-        {
-            "type": 1,
-            "description": "Curto Amperimetro",
-            "duration": 0.0,
-            "input_source": 1,
-            "channels_setup": [
-                {
-                    "id": 3,
-                    "minVolt": 23.0,
-                    "maxVolt": 25.5,
-                    "load": 2.0
-                },
-                {
-                    "id": 4,
-                    "minVolt": 23.0,
-                    "maxVolt": 25.5,
-                    "load": 1.0
-                }
-            ]
-        },
-        {
-            "type": 1,
-            "description": "Curto Amperimetro",
-            "duration": 0.0,
-            "input_source": 1,
-            "channels_setup": [
-                {
-                    "id": 3,
-                    "minVolt": 23.0,
-                    "maxVolt": 25.5,
-                    "load": 2.0
-                },
-                {
-                    "id": 4,
-                    "minVolt": 23.0,
-                    "maxVolt": 25.5,
-                    "load": 1.0
-                }
-            ]
-        },
-        {
-            "type": 1,
-            "description": "Curto Amperimetro",
-            "duration": 0.0,
-            "input_source": 1,
-            "channels_setup": [
-                {
-                    "id": 3,
-                    "minVolt": 23.0,
-                    "maxVolt": 25.5,
-                    "load": 2.0
-                },
-                {
-                    "id": 4,
-                    "minVolt": 23.0,
-                    "maxVolt": 25.5,
-                    "load": 1.0
-                }
-            ]
-        },
-        {
-            "type": 1,
-            "description": "Curto Amperimetro",
-            "duration": 0.0,
-            "input_source": 1,
-            "channels_setup": [
-                {
-                    "id": 3,
-                    "minVolt": 23.0,
-                    "maxVolt": 25.5,
-                    "load": 2.0
-                },
-                {
-                    "id": 4,
-                    "minVolt": 23.0,
-                    "maxVolt": 25.5,
-                    "load": 1.0
+                    "minVolt": 1.0,
+                    "maxVolt": 30.0,
+                    "load": 1.2
                 }
             ]
         }

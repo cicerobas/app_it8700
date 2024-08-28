@@ -67,12 +67,24 @@ class ChannelMonitor(QGroupBox):
         self.vmax_value.setText(f"{values[0]} V")
         self.vmin_value.setText(f"{values[1]} V")
         self.load_value.setText(f"{values[2]} A")
+        self.active_load = float(values[2])
 
     def update_output(self, value: str):
         value = float(value)
         self.v_output_value.setText(
             f'{str(float("%.3f" % value) if value < 10 else "%.2f" % value)} V'
         )
+        self.update_power(value)
+
+    def update_power(self, output: float):
+        value = self.active_load * output
+        if value < 10:
+            fmt_value = "%.3f" % value
+        elif value < 100:
+            fmt_value = "%.2f" % value
+        else:
+            fmt_value = str(int(value))
+        self.power_value.setText(f'{fmt_value} W')
 
 
 def defaut_value_field() -> QLabel:

@@ -56,6 +56,7 @@ class ArduinoController:
         Receives active_pin(str) and set its equivalent value to true in output_pins(dict).
         No return.
         """
+        print(f"ACTIVE PIN: {active_pin}")
         self.set_acctive_pin(True)
         for pin in self.output_pins:
             self.output_pins[pin] = pin == active_pin

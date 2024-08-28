@@ -1,4 +1,5 @@
 import pyvisa
+from time import sleep
 
 from utils.scpi_commands import *
 
@@ -22,7 +23,7 @@ class ElectronicLoadController:
             self.inst_id = id_response.strip()
             inst.write(SYSTEM_REMOTE)
             inst.write(CLEAR_STATUS)
-            inst.write(ALL_INPUTS_ON) #TESTE APENAS
+            inst.write(ALL_INPUTS_ON)  # TESTE APENAS
             return inst
 
         return None
@@ -41,3 +42,8 @@ class ElectronicLoadController:
         self.set_active_channel(channel_id)
         result = self._sat_query(FETCH_VOLT)
         return result
+
+    def set_channel_current(self, channel_id: int, load: float) -> None:
+        self.set_active_channel(channel_id)
+        self._sat_write(f"{SET_CURR}{load}")
+        sleep(0.1)

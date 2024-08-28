@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import QDialog, QFormLayout, QLineEdit, QLabel, QDialogButtonBox
 from PySide6.QtGui import QIntValidator
 
-class CustomDialog(QDialog):
+class DataInputDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
 
@@ -22,5 +22,4 @@ class CustomDialog(QDialog):
         layout.addWidget(self.button_box)
 
     def get_values(self):
-        """Retorna os valores dos campos"""
         return self.number_input.text(), self.operator_input.text()

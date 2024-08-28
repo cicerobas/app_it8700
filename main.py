@@ -10,9 +10,7 @@ from PySide6.QtCore import (
     QMutex,
     QWaitCondition,
     QMutexLocker,
-    Signal,
     Slot,
-    QObject,
     QTimer,
 )
 from PySide6.QtGui import QAction, QIcon, QPixmap, QFont, QShortcut, QKeySequence
@@ -20,6 +18,7 @@ from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
     QPushButton,
+    QDialog,
     QFileDialog,
     QLabel,
     QWidget,
@@ -31,10 +30,12 @@ from PySide6.QtWidgets import (
 
 from controllers.sat_controller import ElectronicLoadController
 from controllers.arduino_controller import ArduinoController
-from models.test_file_model import Test
+from models.test_file_model import *
 from widgets.channel_monitor import ChannelMonitor
 from widgets.steps_table import StepsTable
-from widgets.test_info_dialog import CustomDialog
+from widgets.data_input_dialog import DataInputDialog
+from widgets.wait_key_dialog import WaitKeyDialog
+from utils.delay_manager import DelayManager
 
 
 class CurrentTestSetup:
@@ -43,9 +44,12 @@ class CurrentTestSetup:
     operator_name: str = ""
     channels: list[ChannelMonitor] = []
     is_running: bool = False
+    is_paused: bool = False
     is_single_step: bool = False
     selected_step_index: int = 0
     active_input_source: int = 0
+
+    current_index: int = 0
 
     def increase_serial_number(self):
         self.serial_number = self.serial_number + 1
@@ -75,9 +79,8 @@ class MonitorWorker(QRunnable):
             self.mutex.unlock()
 
             for channel in self.channels:
-                channel.update_output(
-                    self.sat_controller.get_channel_value(channel.channel_id)
-                )
+                result = self.sat_controller.get_channel_value(channel.channel_id)
+                channel.update_output(result)
                 sleep(0.1)
 
     def pause(self):
@@ -105,6 +108,10 @@ class MainWindow(QMainWindow):
         self.thread_pool = QThreadPool()
         self.monitoring_worker = None
 
+        self.delay_manager = DelayManager()
+        self.delay_manager.delay_completed.connect(self.on_delay_completed)
+        self.delay_manager.remaining_time_changed.connect(self.update_timer)
+
         self.setMinimumSize(QSize(1000, 600))
         self.setWindowTitle(
             f"CEBRA - {self.sat_controller.inst_id}"
@@ -114,7 +121,7 @@ class MainWindow(QMainWindow):
 
         # Shortcuts
         self.run_sequence = QShortcut(QKeySequence("Alt+R"), self)
-        self.run_sequence.activated.connect(self.run_test_sequence)
+        self.run_sequence.activated.connect(self.check_test_condition)
 
         # Actions
         open_file_action = QAction(
@@ -215,7 +222,35 @@ class MainWindow(QMainWindow):
             )
             self.thread_pool.start(self.monitoring_worker)
 
-    def run_test_sequence(self):
+    def set_channels_load(self, step: Step):
+        for channel in step.channels_setup:
+            self.sat_controller.set_channel_current(channel.id, channel.load)
+
+    def set_fixed_step_values(self, step: Step):
+        for monitor in self.test_setup.channels:
+            for channel in step.channels_setup:
+                if monitor.channel_id == channel.id:
+                    monitor.update_fixed_values(
+                        [channel.maxVolt, channel.minVolt, channel.load]
+                    )
+
+    @Slot(int)
+    def update_timer(self, remaining_time):
+        value = remaining_time / 1000
+        self.steps_table.update_duration("0.0" if remaining_time < 100 else str(value))
+
+    def handle_step_delay(self, step: Step) -> None:
+        print(f"Duration: {step.duration}")
+        if step.duration == 0:
+            wait_dlg = WaitKeyDialog(step.description)
+            while not wait_dlg.exec():
+                sleep(0.5)
+            self.test_setup.current_index += 1
+            self.run_steps()
+        else:
+            self.delay_manager.start_delay(step.duration * 1000)
+
+    def check_test_condition(self):
         if (
             not self.sat_controller.conn_status
             or not self.arduino_controller.check_connection()
@@ -233,24 +268,40 @@ class MainWindow(QMainWindow):
         # Start setup
         self.test_setup.is_running = True
         self.start_monitoring()
+        self.test_setup.current_index = 0
+        self.run_steps()
 
+    def run_steps(self):
+        steps: list = []
         if self.test_setup.is_single_step:
-            step_list = [
-                self.test_setup.active_test.steps[self.test_setup.selected_step_index]
+            steps = self.test_setup.active_test.steps[
+                self.test_setup.selected_step_index
             ]
         else:
-            step_list = self.test_setup.active_test.steps
+            steps = self.test_setup.active_test.steps
 
-        for index, step in enumerate(step_list):
-            step_done = False
-            while self.test_setup.is_running and not step_done:
-                self.set_input_source(step.input)
-                step_done = True
+        if self.test_setup.current_index < len(steps):
+            step: Step = steps[self.test_setup.current_index]
+            self.steps_table.set_selected_step(self.test_setup.current_index)
+            self.set_fixed_step_values(step)
+            self.set_input_source(step.input_source)
+            match step.type:
+                case 1:
+                    self.set_channels_load(step)
 
-        self.arduino_controller.buzzer()
+            self.handle_step_delay(step)
+        else:
+            self.test_setup.is_running = False
+            self.monitoring_worker.stop()
+            self.arduino_controller.buzzer()
+            print("Teste Encerrado")
+
+    def on_delay_completed(self):
+        self.test_setup.current_index += 1
+        self.run_steps()
 
     def show_test_info_dialog(self) -> bool:
-        dlg = CustomDialog(self)
+        dlg = DataInputDialog(self)
         if dlg.exec():
             sn, name = dlg.get_values()
             self.test_setup.serial_number = sn.zfill(8)
