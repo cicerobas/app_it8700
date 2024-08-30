@@ -3,6 +3,14 @@ from PySide6.QtWidgets import QGroupBox, QHBoxLayout, QVBoxLayout, QGridLayout, 
 from PySide6.QtGui import QFont
 
 
+class Data:
+    output: float = 0
+    vmax: float = 0
+    vmin: float = 0
+    load: float = 0
+    power: float = 0
+
+
 class ChannelMonitor(QGroupBox):
     def __init__(self, channel: int):
         super().__init__()
@@ -13,7 +21,7 @@ class ChannelMonitor(QGroupBox):
             "QGroupBox { border: 2px solid gray; border-radius: 5px; padding: 10px; }"
             "QGroupBox:title { subcontrol-position: top center; padding: 0 10px; }"
         )
-
+        self.data = Data()
         h_layout = QHBoxLayout()
         self.setLayout(h_layout)
 
@@ -64,27 +72,30 @@ class ChannelMonitor(QGroupBox):
 
     def update_fixed_values(self, values: list[str]) -> None:
         # values = ['Vmax', 'Vmin', 'Load']
+        self.data.vmax = float(values[0])
+        self.data.vmin = float(values[1])
+        self.data.load = float(values[2])
+
         self.vmax_value.setText(f"{values[0]} V")
         self.vmin_value.setText(f"{values[1]} V")
         self.load_value.setText(f"{values[2]} A")
-        self.active_load = float(values[2])
 
     def update_output(self, value: str):
-        value = float(value)
+        self.data.output = float(value)
         self.v_output_value.setText(
-            f'{str(float("%.3f" % value) if value < 10 else "%.2f" % value)} V'
+            f'{str(float("%.3f" % self.data.output) if self.data.output < 10 else "%.2f" % self.data.output)} V'
         )
-        self.update_power(value)
+        self.update_power()
 
-    def update_power(self, output: float):
-        value = self.active_load * output
-        if value < 10:
-            fmt_value = "%.3f" % value
-        elif value < 100:
-            fmt_value = "%.2f" % value
+    def update_power(self):
+        self.data.power = self.data.load * self.data.output
+        if self.data.power < 10:
+            fmt_value = "%.3f" % self.data.power
+        elif self.data.power < 100:
+            fmt_value = "%.2f" % self.data.power
         else:
-            fmt_value = str(int(value))
-        self.power_value.setText(f'{fmt_value} W')
+            fmt_value = str(int(self.data.power))
+        self.power_value.setText(f"{fmt_value} W")
 
 
 def defaut_value_field() -> QLabel:

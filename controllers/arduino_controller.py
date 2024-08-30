@@ -33,7 +33,7 @@ class ArduinoController:
         Checks the connection status with the Arduino.
         Returns the connection status(bool).
         """
-        return True if self.arduino is not None else False
+        return True if self.arduino is not None else False            
 
     def set_acctive_pin(self, reset: bool) -> None:
         """
@@ -56,7 +56,6 @@ class ArduinoController:
         Receives active_pin(str) and set its equivalent value to true in output_pins(dict).
         No return.
         """
-        print(f"ACTIVE PIN: {active_pin}")
         self.set_acctive_pin(True)
         for pin in self.output_pins:
             self.output_pins[pin] = pin == active_pin

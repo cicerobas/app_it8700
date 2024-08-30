@@ -5,20 +5,14 @@ from time import sleep
 from PySide6.QtCore import (
     QSize,
     Qt,
-    QRunnable,
     QThreadPool,
-    QMutex,
-    QWaitCondition,
-    QMutexLocker,
     Slot,
-    QTimer,
 )
 from PySide6.QtGui import QAction, QIcon, QPixmap, QFont, QShortcut, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
-    QPushButton,
-    QDialog,
+    QMessageBox,
     QFileDialog,
     QLabel,
     QWidget,
@@ -26,6 +20,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QGridLayout,
     QSizePolicy,
+    QDialog,
 )
 
 from controllers.sat_controller import ElectronicLoadController
@@ -36,6 +31,8 @@ from widgets.steps_table import StepsTable
 from widgets.data_input_dialog import DataInputDialog
 from widgets.wait_key_dialog import WaitKeyDialog
 from utils.delay_manager import DelayManager
+from utils.enums import *
+from utils.monitor_worker import MonitorWorker
 
 
 class CurrentTestSetup:
@@ -43,66 +40,26 @@ class CurrentTestSetup:
     serial_number: str = None
     operator_name: str = ""
     channels: list[ChannelMonitor] = []
-    is_running: bool = False
-    is_paused: bool = False
+    serial_number_changed: bool = False  # True caso usuario mude o número de serie
     is_single_step: bool = False
     selected_step_index: int = 0
     active_input_source: int = 0
-
     current_index: int = 0
+    test_result_data = dict()
+    test_sequence_status: list[bool] = []
 
-    def increase_serial_number(self):
-        self.serial_number = self.serial_number + 1
+    def set_next_serial_number(self):
+        self.serial_number = str(int(self.serial_number) + 1).zfill(8)
 
-
-class MonitorWorker(QRunnable):
-    def __init__(
-        self,
-        channels: list[ChannelMonitor],
-        sat_controller: ElectronicLoadController,
-    ):
-        super().__init__()
-        self.channels = channels
-        self.sat_controller = sat_controller
-        self.mutex = QMutex()
-        self.wait_condition = QWaitCondition()
-        self.paused = False
-        self.running = True
-
-    def run(self):
-        while self.running:
-            self.mutex.lock()
-            while self.paused:
-                self.wait_condition.wait(
-                    self.mutex
-                )  # Pausa até que seja sinalizado para continuar
-            self.mutex.unlock()
-
-            for channel in self.channels:
-                result = self.sat_controller.get_channel_value(channel.channel_id)
-                channel.update_output(result)
-                sleep(0.1)
-
-    def pause(self):
-        with QMutexLocker(self.mutex):
-            self.paused = True
-
-    def resume(self):
-        with QMutexLocker(self.mutex):
-            self.paused = False
-            self.wait_condition.wakeAll()  # Notifica a thread para continuar
-
-    def stop(self):
-        with QMutexLocker(self.mutex):
-            self.running = False
-            self.paused = False
-            self.wait_condition.wakeAll()  # Garante que a thread saia do estado de pausa
+    def get_active_channel_ids(self) -> list[int]:
+        return list(map(lambda channel: channel.id, self.active_test.active_channels))
 
 
 class MainWindow(QMainWindow):
     def __init__(self, test_setup: CurrentTestSetup):
         super().__init__()
         self.test_setup = test_setup
+        self.state = TestState.NONE
         self.sat_controller = ElectronicLoadController()
         self.arduino_controller = ArduinoController()
         self.thread_pool = QThreadPool()
@@ -118,10 +75,14 @@ class MainWindow(QMainWindow):
             if self.sat_controller.conn_status
             else "CEBRA - IT8700 Sem Conexão"
         )
-
+        
         # Shortcuts
-        self.run_sequence = QShortcut(QKeySequence("Alt+R"), self)
-        self.run_sequence.activated.connect(self.check_test_condition)
+        self.start_shortcut = QShortcut(QKeySequence("Alt+R"), self)
+        self.pause_shortcut = QShortcut(QKeySequence("Alt+P"), self)
+        self.stop_shortcut = QShortcut(QKeySequence("Alt+S"), self)
+        self.start_shortcut.activated.connect(self.start_test_sequence)
+        self.pause_shortcut.activated.connect(self.pause_test_sequence)
+        self.stop_shortcut.activated.connect(self.cancel_test_sequence)
 
         # Actions
         open_file_action = QAction(
@@ -134,6 +95,7 @@ class MainWindow(QMainWindow):
         file_menu = menu.addMenu("&Arquivo")
         file_menu.addAction(open_file_action)
 
+        # Logo
         logo = QLabel()
         logo.setPixmap(QPixmap("assets/logo.png"))
         logo.setScaledContents(True)
@@ -149,7 +111,7 @@ class MainWindow(QMainWindow):
         operator_label = info_label("Operador: ")
         self.operator_value = info_label("")
 
-        # info panel
+        # Test Details
         info_panel = QGridLayout()
         info_panel.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         info_panel.setColumnMinimumWidth(2, 50)
@@ -162,11 +124,12 @@ class MainWindow(QMainWindow):
         info_panel.addWidget(operator_label, 1, 3)
         info_panel.addWidget(self.operator_value, 1, 4)
 
-        # header
+        # Header
         header_layout = QHBoxLayout()
         header_layout.addWidget(logo)
         header_layout.addLayout(info_panel)
 
+        # Layout
         self.steps_table = StepsTable()
         self.body_layout = QHBoxLayout()
         self.channels_layout = QVBoxLayout()
@@ -175,7 +138,6 @@ class MainWindow(QMainWindow):
         self.body_layout.addWidget(self.steps_table)
         self.body_layout.addLayout(self.channels_layout)
 
-        # main layout
         main_layout = QVBoxLayout()
         main_layout.setAlignment(Qt.AlignTop)
         main_layout.addLayout(header_layout)
@@ -186,15 +148,13 @@ class MainWindow(QMainWindow):
 
     def set_input_source(self, input_source: int) -> None:
         """
-        Receives input_source(int) and send it to arduino_ctrl using the predefined pins configuration and input_type.
-            - Pin 4: CA1
-            - Pin 5: CA2
-            - Pin 6: CA3
-            - Pin 7: CC1
-            - Pin 8: CC2
-            - Pin 9: CC3
-            - Pin 10: Buzzer
-        No return.
+        - Pino 4: CA1
+        - Pino 5: CA2
+        - Pino 6: CA3
+        - Pino 7: CC1
+        - Pino 8: CC2
+        - Pino 9: CC3
+        - Pino 10: Buzzer
         """
         if self.test_setup.active_input_source != input_source:
             input_type = self.test_setup.active_test.input_type
@@ -215,12 +175,13 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def start_monitoring(self):
-        print("Monitorando...")
         if self.monitoring_worker is None:
             self.monitoring_worker = MonitorWorker(
                 self.test_setup.channels, self.sat_controller
             )
             self.thread_pool.start(self.monitoring_worker)
+        else:
+            self.monitoring_worker.resume()
 
     def set_channels_load(self, step: Step):
         for channel in step.channels_setup:
@@ -240,36 +201,43 @@ class MainWindow(QMainWindow):
         self.steps_table.update_duration("0.0" if remaining_time < 100 else str(value))
 
     def handle_step_delay(self, step: Step) -> None:
-        print(f"Duration: {step.duration}")
         if step.duration == 0:
             wait_dlg = WaitKeyDialog(step.description)
-            while not wait_dlg.exec():
-                sleep(0.5)
+            result = wait_dlg.exec()
+            if result == QDialog.Rejected:
+                self.cancel_test_sequence()
+                return
+
+            self.handle_test_data(self.validate_step_values())
             self.test_setup.current_index += 1
             self.run_steps()
         else:
             self.delay_manager.start_delay(step.duration * 1000)
 
-    def check_test_condition(self):
-        if (
-            not self.sat_controller.conn_status
-            or not self.arduino_controller.check_connection()
-        ):
-            return
-        if self.test_setup.active_test is None or self.test_setup.is_running:
-            return
-        if (
-            self.test_setup.serial_number is None
-            or self.test_setup.operator_name is None
-        ):
-            if not self.show_test_info_dialog():
-                return
+    def validate_step_values(self) -> tuple:
+        step_pass = True
+        current_step_data = []
 
-        # Start setup
-        self.test_setup.is_running = True
-        self.start_monitoring()
-        self.test_setup.current_index = 0
-        self.run_steps()
+        for channel in self.test_setup.channels:
+            step_pass = (
+                channel.data.vmin <= channel.data.output <= channel.data.vmax
+            ) and step_pass
+            current_step_data.append(
+                dict(
+                    channel_id=str(channel.channel_id),
+                    output=str(channel.data.output),
+                    vmax=str(channel.data.vmax),
+                    vmin=str(channel.data.vmin),
+                    load=str(channel.data.load),
+                    power=str(channel.data.power),
+                )
+            )
+
+        self.steps_table.set_step_status(step_pass)
+        self.test_setup.test_sequence_status.append(step_pass)
+        channels_data = tuple((current_step_data))
+        current_step_data.clear()
+        return channels_data
 
     def run_steps(self):
         steps: list = []
@@ -291,27 +259,63 @@ class MainWindow(QMainWindow):
 
             self.handle_step_delay(step)
         else:
-            self.test_setup.is_running = False
-            self.monitoring_worker.stop()
-            self.arduino_controller.buzzer()
+            if self.state is not TestState.CANCELED:
+                self.state = (
+                    TestState.PASSED
+                    if False not in self.test_setup.test_sequence_status
+                    and not self.test_setup.is_single_step
+                    else TestState.FAILED
+                )
+
+            self.reset_setup()
+            self.update_state_label()
+            # GERAR ARQUIVO
+
             print("Teste Encerrado")
 
+    def handle_test_data(self, data: tuple):
+        self.test_setup.test_result_data["steps"].append(
+            dict(
+                description=self.test_setup.active_test.steps[
+                    self.test_setup.current_index
+                ].description,
+                channels=data,
+            )
+        )
+
     def on_delay_completed(self):
+        self.handle_test_data(self.validate_step_values())
         self.test_setup.current_index += 1
         self.run_steps()
 
-    def show_test_info_dialog(self) -> bool:
+    def reset_setup(self):
+        self.sat_controller.toggle_active_channels_input(
+            self.test_setup.get_active_channel_ids(), False
+        )
+        self.monitoring_worker.pause()
+        self.delay_manager.timer.stop()
+        self.test_setup.test_sequence_status.clear()
+        self.test_setup.is_single_step = False
+        self.test_setup.active_input_source = 0
+        self.test_setup.current_index = 0
+        self.arduino_controller.set_acctive_pin(True)
+        self.arduino_controller.buzzer()
+
+    def update_test_info(self):
+        self.sn_value.setText(self.test_setup.serial_number)
+        self.operator_value.setText(self.test_setup.operator_name)
+
+    def show_test_info_input_dialog(self) -> bool:
         dlg = DataInputDialog(self)
         if dlg.exec():
             sn, name = dlg.get_values()
             self.test_setup.serial_number = sn.zfill(8)
             self.test_setup.operator_name = name
-            self.sn_value.setText(self.test_setup.serial_number)
-            self.operator_value.setText(self.test_setup.operator_name)
+            self.update_test_info()
             return True
         return False
 
-    def update_test_info(self):
+    def setup_test_details(self):
         self.group_value.setText(self.test_setup.active_test.group)
         self.model_value.setText(self.test_setup.active_test.model)
         self.steps_table.update_step_list(self.test_setup.active_test.steps)
@@ -334,16 +338,110 @@ class MainWindow(QMainWindow):
             self, filter="*.json", caption="Abrir arquivo de teste..."
         )[0]
         if fileName != "":
-            print(fileName)
             with open(fileName) as loaded_file:
                 test_data = json.load(loaded_file)
             try:
                 self.test_setup.active_test = Test(**test_data)
             except:
-                print("ERRO, arquivo inválido!")
+                show_custom_alert_dialog(
+                    self, f"Arquivo inválido\n{fileName}", QMessageBox.Critical
+                )
 
         if self.test_setup.active_test is not None:
+            self.setup_test_details()
+
+    def start_test_sequence(self):
+        if self.state in [TestState.RUNNING, TestState.PAUSED]:
+            return
+        if not self.sat_controller.conn_status:
+            show_custom_alert_dialog(
+                self, "SAT IT8700 - Sem Conexão", QMessageBox.Critical
+            )
+            return
+        if not self.arduino_controller.check_connection():
+            show_custom_alert_dialog(
+                self, "Arduino - Sem Conexão", QMessageBox.Critical
+            )
+            return
+        if self.test_setup.active_test is None:
+            show_custom_alert_dialog(
+                self, "Carregue um Arquivo de Teste", QMessageBox.Information
+            )
+            return
+        if (
+            self.test_setup.serial_number is None
+            or self.test_setup.operator_name is None
+        ):
+            if not self.show_test_info_input_dialog():
+                return
+
+        if (
+            self.state is TestState.PASSED
+            and not self.test_setup.is_single_step
+            and not self.test_setup.serial_number_changed
+        ):
+            self.test_setup.set_next_serial_number()
             self.update_test_info()
+
+        # Start setup
+        self.test_setup.test_result_data.update(
+            group=self.test_setup.active_test.group,
+            model=self.test_setup.active_test.model,
+            customer=self.test_setup.active_test.customer,
+            operator=self.operator_value.text(),
+            series_number=self.sn_value.text(),
+            steps=[],
+        )
+
+        self.sat_controller.toggle_active_channels_input(
+            self.test_setup.get_active_channel_ids(), True
+        )
+        if self.state is not TestState.NONE:
+            self.steps_table.reset_table()
+
+        self.state = TestState.RUNNING
+        self.update_state_label()
+        self.start_monitoring()
+        self.test_setup.current_index = 0
+        self.run_steps()
+
+    def pause_test_sequence(self):
+        if self.state not in [TestState.RUNNING, TestState.PAUSED]:
+            return
+        self.delay_manager.pause_resume()
+        match self.state:
+            case TestState.PAUSED:
+                self.state = TestState.RUNNING
+            case TestState.RUNNING:
+                self.state = TestState.PAUSED
+
+        self.update_state_label()
+
+    def cancel_test_sequence(self):
+        if self.state not in [TestState.RUNNING, TestState.PAUSED]:
+            return
+
+        self.state = TestState.CANCELED
+        self.update_state_label()
+        self.reset_setup()
+
+    def update_state_label(self):  # MOSTRAR ESTADO NA TELA
+        print(f"STATE: {self.state.value}")
+
+    def closeEvent(self, event):
+        self.monitoring_worker.stop()
+        event.accept()
+        
+def show_custom_alert_dialog(self, text: str, type: QMessageBox.Icon) -> None:
+    dlg = QMessageBox(self)
+    dlg.setWindowTitle("Informação" if type == QMessageBox.Information else "Erro")
+    dlg.setText(text)
+    dlg.setFont(QFont("Arial", 14))
+    dlg.setStandardButtons(
+        QMessageBox.Ok if type == QMessageBox.Information else QMessageBox.Close
+    )
+    dlg.setIcon(type)
+    dlg.exec()
 
 
 def info_label(text: str) -> QLabel:

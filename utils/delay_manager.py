@@ -15,12 +15,20 @@ class DelayManager(QObject):
         self.remaining_time  = delay
         self.timer.start(delay)
         self.update_timer()
-
+    
+    def pause_resume(self):
+        if self.timer.isActive():
+            self.timer.stop()
+        else:
+            self.timer.start(self.remaining_time)
+            self.update_timer()
+        
     def update_timer(self):
-        if self.remaining_time > 0:
-            self.remaining_time -= 100
-            QTimer.singleShot(100, self.update_timer)
-        self.remaining_time_changed.emit(self.remaining_time)
+        if self.timer.isActive():
+            if self.remaining_time > 0:
+                self.remaining_time -= 100
+                QTimer.singleShot(100, self.update_timer)
+            self.remaining_time_changed.emit(self.remaining_time)
 
     def on_complete(self):
         self.delay_completed.emit()

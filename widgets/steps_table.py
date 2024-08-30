@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import QTableWidget, QTableWidgetItem, QSizePolicy
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QColor, QBrush
 from PySide6.QtCore import Qt
 
 from models.test_file_model import Step
@@ -15,7 +15,7 @@ class StepsTable(QTableWidget):
         self.setEditTriggers(QTableWidget.NoEditTriggers)
         self.setSelectionBehavior(QTableWidget.SelectRows)
         self.setSelectionMode(QTableWidget.SingleSelection)
-        
+
     def update_step_list(self, steps: list[Step]) -> None:
         self.setRowCount(0)
         for row, step in enumerate(steps):
@@ -33,6 +33,21 @@ class StepsTable(QTableWidget):
         self.selectRow(index)
 
     def update_duration(self, new_value: str):
-        self.setItem(self.currentRow(), 1, QTableWidgetItem(new_value))
-        
-        
+        item = QTableWidgetItem(new_value)
+        item.setTextAlignment(Qt.AlignCenter)
+        self.setItem(self.currentRow(), 1, item)
+
+    def set_step_status(self, status: bool):
+        item = QTableWidgetItem("PASS" if status else "FAIL")
+        item.setTextAlignment(Qt.AlignCenter)
+        item.setForeground(QBrush(QColor("green" if status else "red")))
+        self.setItem(self.currentRow(), 2, item)
+
+    def reset_table(self):
+        row = 0
+        while row < self.rowCount():
+            status = QTableWidgetItem("---")
+            status.setTextAlignment(Qt.AlignCenter)
+            status.setForeground(QBrush(QColor("black")))
+            self.setItem(row, 2, status)
+            row += 1

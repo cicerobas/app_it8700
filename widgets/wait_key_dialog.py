@@ -25,7 +25,6 @@ class WaitKeyDialog(QDialog):
         self.center()
 
     def center(self):
-        # Obtém a geometria da tela e calcula a posição central
         screen_geometry = QApplication.primaryScreen().geometry()
         dialog_geometry = self.frameGeometry()
         center_point = screen_geometry.center()
@@ -33,7 +32,11 @@ class WaitKeyDialog(QDialog):
         self.move(dialog_geometry.topLeft())
 
     def keyPressEvent(self, event: QKeyEvent):
-        if event.key() == Qt.Key_Return:
+        if event.key() == Qt.Key_Enter or event.key() == Qt.Key_Return:
+            print("ACCEPT")
             self.accept()
+        elif event.key() == Qt.Key_S and event.modifiers() == Qt.AltModifier:
+            print("REJECT")
+            self.reject()
         else:
-            super().keyPressEvent(event)
+            event.ignore()
