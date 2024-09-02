@@ -1,21 +1,15 @@
 from PySide6.QtCore import QRunnable, QMutex, QWaitCondition, QMutexLocker
 from time import sleep
 
-from widgets.channel_monitor import ChannelMonitor
-from controllers.sat_controller import ElectronicLoadController
-
-
 class MonitorWorker(QRunnable):
     def __init__(
         self,
-        channels: list[ChannelMonitor],
-        sat_controller: ElectronicLoadController,
+        signals
     ):
         super().__init__()
-        self.channels = channels
-        self.sat_controller = sat_controller
         self.mutex = QMutex()
         self.wait_condition = QWaitCondition()
+        self.signals = signals
         self.paused = False
         self.running = True
 
@@ -28,10 +22,8 @@ class MonitorWorker(QRunnable):
                 )  # Pausa até que seja sinalizado para continuar
             self.mutex.unlock()
 
-            for channel in self.channels:
-                result = self.sat_controller.get_channel_value(channel.channel_id)
-                channel.update_output(result)
-                sleep(0.1)
+            self.signals.update_output.emit()
+            sleep(0.1)
 
     def pause(self):
         with QMutexLocker(self.mutex):

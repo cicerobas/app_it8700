@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QTableWidget, QTableWidgetItem, QSizePolicy
+from PySide6.QtWidgets import QTableWidget, QTableWidgetItem
 from PySide6.QtGui import QFont, QColor, QBrush
 from PySide6.QtCore import Qt
 
@@ -15,6 +15,7 @@ class StepsTable(QTableWidget):
         self.setEditTriggers(QTableWidget.NoEditTriggers)
         self.setSelectionBehavior(QTableWidget.SelectRows)
         self.setSelectionMode(QTableWidget.SingleSelection)
+        self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
 
     def update_step_list(self, steps: list[Step]) -> None:
         self.setRowCount(0)
@@ -45,6 +46,7 @@ class StepsTable(QTableWidget):
 
     def reset_table(self):
         row = 0
+        self.clearSelection()
         while row < self.rowCount():
             status = QTableWidgetItem("---")
             status.setTextAlignment(Qt.AlignCenter)

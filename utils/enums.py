@@ -7,4 +7,5 @@ class TestState(Enum):
     CANCELED = "Cancelado"
     PASSED = "Aprovado"
     FAILED = "Reprovado"
+    WAITKEY = "Aperte ENTER para continuar"
     NONE = ""

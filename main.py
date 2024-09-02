@@ -2,13 +2,17 @@ import sys
 import json
 from time import sleep
 
-from PySide6.QtCore import (
-    QSize,
-    Qt,
-    QThreadPool,
-    Slot,
+from PySide6.QtCore import QSize, Qt, QThreadPool, Slot, Signal, QObject
+from PySide6.QtGui import (
+    QAction,
+    QIcon,
+    QPixmap,
+    QFont,
+    QShortcut,
+    QKeySequence,
+    QIntValidator,
+    QKeyEvent,
 )
-from PySide6.QtGui import QAction, QIcon, QPixmap, QFont, QShortcut, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -20,7 +24,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QGridLayout,
     QSizePolicy,
-    QDialog,
+    QLineEdit,
 )
 
 from controllers.sat_controller import ElectronicLoadController
@@ -29,7 +33,6 @@ from models.test_file_model import *
 from widgets.channel_monitor import ChannelMonitor
 from widgets.steps_table import StepsTable
 from widgets.data_input_dialog import DataInputDialog
-from widgets.wait_key_dialog import WaitKeyDialog
 from utils.delay_manager import DelayManager
 from utils.enums import *
 from utils.monitor_worker import MonitorWorker
@@ -40,9 +43,9 @@ class CurrentTestSetup:
     serial_number: str = None
     operator_name: str = ""
     channels: list[ChannelMonitor] = []
-    serial_number_changed: bool = False  # True caso usuario mude o número de serie
+    serial_number_changed: bool = False
     is_single_step: bool = False
-    selected_step_index: int = 0
+    selected_step_index: int = -1
     active_input_source: int = 0
     current_index: int = 0
     test_result_data = dict()
@@ -55,45 +58,53 @@ class CurrentTestSetup:
         return list(map(lambda channel: channel.id, self.active_test.active_channels))
 
 
+class WorkerSignals(QObject):
+    update_output = Signal()
+
+
 class MainWindow(QMainWindow):
     def __init__(self, test_setup: CurrentTestSetup):
         super().__init__()
         self.test_setup = test_setup
         self.state = TestState.NONE
+        self.running = False
         self.sat_controller = ElectronicLoadController()
         self.arduino_controller = ArduinoController()
         self.thread_pool = QThreadPool()
-        self.monitoring_worker = None
-
+        self.worker_signals = WorkerSignals()
         self.delay_manager = DelayManager()
+        self.monitoring_worker = None
         self.delay_manager.delay_completed.connect(self.on_delay_completed)
         self.delay_manager.remaining_time_changed.connect(self.update_timer)
+        self.worker_signals.update_output.connect(self.update_output)
 
-        self.setMinimumSize(QSize(1000, 600))
+        self.setMinimumSize(QSize(1200, 600))
         self.setWindowTitle(
             f"CEBRA - {self.sat_controller.inst_id}"
             if self.sat_controller.conn_status
             else "CEBRA - IT8700 Sem Conexão"
         )
-        
+
         # Shortcuts
         self.start_shortcut = QShortcut(QKeySequence("Alt+R"), self)
         self.pause_shortcut = QShortcut(QKeySequence("Alt+P"), self)
         self.stop_shortcut = QShortcut(QKeySequence("Alt+S"), self)
+        self.single_run_shortcut = QShortcut(QKeySequence("Ctrl+R"), self)
         self.start_shortcut.activated.connect(self.start_test_sequence)
         self.pause_shortcut.activated.connect(self.pause_test_sequence)
         self.stop_shortcut.activated.connect(self.cancel_test_sequence)
+        self.single_run_shortcut.activated.connect(self.handle_single__run)
 
         # Actions
-        open_file_action = QAction(
+        self.open_file_action = QAction(
             QIcon("assets/icons/file_open.png"), "Abrir Arquivo", self
         )
-        open_file_action.triggered.connect(self.open_test_file)
+        self.open_file_action.triggered.connect(self.open_test_file)
 
         # Menu
         menu = self.menuBar()
         file_menu = menu.addMenu("&Arquivo")
-        file_menu.addAction(open_file_action)
+        file_menu.addAction(self.open_file_action)
 
         # Logo
         logo = QLabel()
@@ -102,16 +113,40 @@ class MainWindow(QMainWindow):
         logo.setFixedSize(150, 100)
 
         # Labels
-        group_label = info_label("Grupo: ")
-        self.group_value = info_label("")
-        model_label = info_label("Modelo: ")
-        self.model_value = info_label("")
-        sn_label = info_label("Nº: ")
-        self.sn_value = info_label("")
-        operator_label = info_label("Operador: ")
-        self.operator_value = info_label("")
+        group_label = QLabel("Grupo: ")
+        model_label = QLabel("Modelo: ")
+        sn_label = QLabel("Nº de Serie: ")
+        operator_label = QLabel("Operador: ")
+        self.status_label = QLabel("---")
 
-        # Test Details
+        self.group_value = QLineEdit()
+        self.model_value = QLineEdit()
+        self.sn_value = QLineEdit()
+        self.operator_name = QLineEdit()
+
+        label_font = QFont("Arial", 16)
+        group_label.setFont(label_font)
+        model_label.setFont(label_font)
+        sn_label.setFont(label_font)
+        operator_label.setFont(label_font)
+        self.status_label.setFont(QFont("Arial", 24, QFont.Bold))
+        self.status_label.setContentsMargins(50, 0, 50, 0)
+        self.status_label.setAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
+
+        self.group_value.setReadOnly(True)
+        self.group_value.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.model_value.setReadOnly(True)
+        self.model_value.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.sn_value.setValidator(QIntValidator(0, 99999999, self))
+        self.sn_value.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+        self.operator_name.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+
+        self.sn_value.textEdited.connect(self.sn_changed)
+        self.operator_name.textEdited.connect(self.op_name_changed)
+
+        # Test Details Layout
         info_panel = QGridLayout()
         info_panel.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         info_panel.setColumnMinimumWidth(2, 50)
@@ -122,14 +157,16 @@ class MainWindow(QMainWindow):
         info_panel.addWidget(sn_label, 0, 3)
         info_panel.addWidget(self.sn_value, 0, 4)
         info_panel.addWidget(operator_label, 1, 3)
-        info_panel.addWidget(self.operator_value, 1, 4)
+        info_panel.addWidget(self.operator_name, 1, 4)
 
         # Header
         header_layout = QHBoxLayout()
         header_layout.addWidget(logo)
+        header_layout.addSpacing(20)
         header_layout.addLayout(info_panel)
+        header_layout.addWidget(self.status_label, Qt.AlignmentFlag.AlignRight)
 
-        # Layout
+        # Body and Main Layouts
         self.steps_table = StepsTable()
         self.body_layout = QHBoxLayout()
         self.channels_layout = QVBoxLayout()
@@ -137,7 +174,6 @@ class MainWindow(QMainWindow):
         self.channels_layout.setSpacing(20)
         self.body_layout.addWidget(self.steps_table)
         self.body_layout.addLayout(self.channels_layout)
-
         main_layout = QVBoxLayout()
         main_layout.setAlignment(Qt.AlignTop)
         main_layout.addLayout(header_layout)
@@ -176,9 +212,7 @@ class MainWindow(QMainWindow):
     @Slot()
     def start_monitoring(self):
         if self.monitoring_worker is None:
-            self.monitoring_worker = MonitorWorker(
-                self.test_setup.channels, self.sat_controller
-            )
+            self.monitoring_worker = MonitorWorker(self.worker_signals)
             self.thread_pool.start(self.monitoring_worker)
         else:
             self.monitoring_worker.resume()
@@ -198,19 +232,18 @@ class MainWindow(QMainWindow):
     @Slot(int)
     def update_timer(self, remaining_time):
         value = remaining_time / 1000
-        self.steps_table.update_duration("0.0" if remaining_time < 100 else str(value))
+        self.steps_table.update_duration(str(value))
+
+    def update_output(self):
+        for channel in self.test_setup.channels:
+            channel.update_output(
+                self.sat_controller.get_channel_value(channel.channel_id)
+            )
 
     def handle_step_delay(self, step: Step) -> None:
         if step.duration == 0:
-            wait_dlg = WaitKeyDialog(step.description)
-            result = wait_dlg.exec()
-            if result == QDialog.Rejected:
-                self.cancel_test_sequence()
-                return
-
-            self.handle_test_data(self.validate_step_values())
-            self.test_setup.current_index += 1
-            self.run_steps()
+            self.state = TestState.WAITKEY
+            self.update_status_label(step.description)
         else:
             self.delay_manager.start_delay(step.duration * 1000)
 
@@ -242,15 +275,18 @@ class MainWindow(QMainWindow):
     def run_steps(self):
         steps: list = []
         if self.test_setup.is_single_step:
-            steps = self.test_setup.active_test.steps[
-                self.test_setup.selected_step_index
+            steps = [
+                self.test_setup.active_test.steps[self.test_setup.selected_step_index]
             ]
         else:
             steps = self.test_setup.active_test.steps
 
         if self.test_setup.current_index < len(steps):
             step: Step = steps[self.test_setup.current_index]
-            self.steps_table.set_selected_step(self.test_setup.current_index)
+
+            if not self.test_setup.is_single_step:
+                self.steps_table.set_selected_step(self.test_setup.current_index)
+
             self.set_fixed_step_values(step)
             self.set_input_source(step.input_source)
             match step.type:
@@ -267,11 +303,11 @@ class MainWindow(QMainWindow):
                     else TestState.FAILED
                 )
 
+            self.update_status_label()
             self.reset_setup()
-            self.update_state_label()
             # GERAR ARQUIVO
 
-            print("Teste Encerrado")
+            print("Teste Encerrado")  # FIM
 
     def handle_test_data(self, data: tuple):
         self.test_setup.test_result_data["steps"].append(
@@ -292,18 +328,35 @@ class MainWindow(QMainWindow):
         self.sat_controller.toggle_active_channels_input(
             self.test_setup.get_active_channel_ids(), False
         )
+        self.arduino_controller.set_acctive_pin(True)
         self.monitoring_worker.pause()
-        self.delay_manager.timer.stop()
+        self.delay_manager.paused = False
+        self.open_file_action.setDisabled(False)
         self.test_setup.test_sequence_status.clear()
+        self.test_setup.serial_number_changed = False
         self.test_setup.is_single_step = False
+        self.test_setup.selected_step_index = -1
         self.test_setup.active_input_source = 0
         self.test_setup.current_index = 0
-        self.arduino_controller.set_acctive_pin(True)
-        self.arduino_controller.buzzer()
+        self.steps_table.clearSelection()
+        self.steps_table.reset_table()
+
+        while not self.arduino_controller.buzzer():
+            continue
+        else:
+            self.running = False
+
+    def sn_changed(self):
+        self.test_setup.serial_number = str(int(self.sn_value.text())).zfill(8)
+        self.sn_value.setText(self.test_setup.serial_number)
+        self.test_setup.serial_number_changed = True
+
+    def op_name_changed(self):
+        self.test_setup.operator_name = self.operator_name.text()
 
     def update_test_info(self):
         self.sn_value.setText(self.test_setup.serial_number)
-        self.operator_value.setText(self.test_setup.operator_name)
+        self.operator_name.setText(self.test_setup.operator_name)
 
     def show_test_info_input_dialog(self) -> bool:
         dlg = DataInputDialog(self)
@@ -350,8 +403,16 @@ class MainWindow(QMainWindow):
         if self.test_setup.active_test is not None:
             self.setup_test_details()
 
+    def handle_single__run(self):
+        if self.steps_table.currentRow() >= 0:
+            self.test_setup.is_single_step = True
+            self.test_setup.selected_step_index = self.steps_table.currentRow()
+            self.start_test_sequence()
+
     def start_test_sequence(self):
-        if self.state in [TestState.RUNNING, TestState.PAUSED]:
+        if self.running:
+            return
+        if self.state in [TestState.RUNNING, TestState.PAUSED, TestState.WAITKEY]:
             return
         if not self.sat_controller.conn_status:
             show_custom_alert_dialog(
@@ -368,10 +429,7 @@ class MainWindow(QMainWindow):
                 self, "Carregue um Arquivo de Teste", QMessageBox.Information
             )
             return
-        if (
-            self.test_setup.serial_number is None
-            or self.test_setup.operator_name is None
-        ):
+        if self.test_setup.serial_number is None:
             if not self.show_test_info_input_dialog():
                 return
 
@@ -388,7 +446,7 @@ class MainWindow(QMainWindow):
             group=self.test_setup.active_test.group,
             model=self.test_setup.active_test.model,
             customer=self.test_setup.active_test.customer,
-            operator=self.operator_value.text(),
+            operator=self.operator_name.text(),
             series_number=self.sn_value.text(),
             steps=[],
         )
@@ -399,8 +457,10 @@ class MainWindow(QMainWindow):
         if self.state is not TestState.NONE:
             self.steps_table.reset_table()
 
+        self.open_file_action.setDisabled(True)
         self.state = TestState.RUNNING
-        self.update_state_label()
+        self.running = True
+        self.update_status_label()
         self.start_monitoring()
         self.test_setup.current_index = 0
         self.run_steps()
@@ -415,23 +475,53 @@ class MainWindow(QMainWindow):
             case TestState.RUNNING:
                 self.state = TestState.PAUSED
 
-        self.update_state_label()
+        self.update_status_label()
 
     def cancel_test_sequence(self):
-        if self.state not in [TestState.RUNNING, TestState.PAUSED]:
+        if self.state not in [TestState.RUNNING, TestState.PAUSED, TestState.WAITKEY]:
             return
 
         self.state = TestState.CANCELED
-        self.update_state_label()
+        self.update_status_label()
+        self.delay_manager.remaining_time = 0 # NAO FUNCIONA
         self.reset_setup()
 
-    def update_state_label(self):  # MOSTRAR ESTADO NA TELA
-        print(f"STATE: {self.state.value}")
+    def update_status_label(self, step_description: str = ""):
+        if self.state is TestState.WAITKEY:
+            self.status_label.setText(f"{step_description}\n{self.state.value}")
+            self.status_label.setStyleSheet("color:blue;")
+        else:
+            self.status_label.setText(self.state.value)
+            match self.state:
+                case TestState.PASSED | TestState.RUNNING:
+                    color = "green"
+                case TestState.FAILED | TestState.CANCELED:
+                    color = "red"
+                case TestState.PAUSED:
+                    color = "orange"
+                case _:
+                    color = "black"
+            self.status_label.setStyleSheet(f"color:{color};")
+
+    def keyPressEvent(self, event: QKeyEvent):
+        if self.state is TestState.WAITKEY and event.key() in [
+            Qt.Key.Key_Return,
+            Qt.Key.Key_Enter,
+        ]:
+            self.state = TestState.RUNNING
+            self.on_delay_completed()
 
     def closeEvent(self, event):
-        self.monitoring_worker.stop()
+        if self.monitoring_worker is not None:
+            self.monitoring_worker.stop()
+        if self.sat_controller.conn_status:
+            self.sat_controller.inst_resource.close()
+        if self.arduino_controller.arduino is not None:
+            self.arduino_controller.arduino.conn.close()
+
         event.accept()
-        
+
+
 def show_custom_alert_dialog(self, text: str, type: QMessageBox.Icon) -> None:
     dlg = QMessageBox(self)
     dlg.setWindowTitle("Informação" if type == QMessageBox.Information else "Erro")
@@ -442,14 +532,6 @@ def show_custom_alert_dialog(self, text: str, type: QMessageBox.Icon) -> None:
     )
     dlg.setIcon(type)
     dlg.exec()
-
-
-def info_label(text: str) -> QLabel:
-    font = QFont()
-    font.setPointSize(16)
-    label = QLabel(text)
-    label.setFont(font)
-    return label
 
 
 if __name__ == "__main__":

@@ -82,21 +82,32 @@ class ChannelMonitor(QGroupBox):
 
     def update_output(self, value: str):
         self.data.output = float(value)
-        self.v_output_value.setText(
-            f'{str(float("%.3f" % self.data.output) if self.data.output < 10 else "%.2f" % self.data.output)} V'
-        )
+        background_color = "#81C784"
+        self.v_output_value.setText(f'{"%.2f" % self.data.output} V')
+        if self.data.output > self.data.vmax:
+            background_color = "#E57373"
+        elif self.data.output < self.data.vmin:
+            background_color = "#FFF176"
+
+        self.v_output_value.setStyleSheet(f"background-color:{background_color};")
         self.update_power()
 
     def update_power(self):
         self.data.power = self.data.load * self.data.output
-        if self.data.power < 10:
-            fmt_value = "%.3f" % self.data.power
-        elif self.data.power < 100:
-            fmt_value = "%.2f" % self.data.power
-        else:
+        if self.data.power > 100:
             fmt_value = str(int(self.data.power))
+        
+        fmt_value = "%.2f" % self.data.power
         self.power_value.setText(f"{fmt_value} W")
 
+
+# if self.data.power < 10:
+        #     fmt_value = "%.3f" % self.data.power
+        # elif self.data.power < 100:
+        #     fmt_value = "%.2f" % self.data.power
+        # else:
+        #     fmt_value = str(int(self.data.power))
+        
 
 def defaut_value_field() -> QLabel:
     label = QLabel("0.0")

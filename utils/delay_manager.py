@@ -1,34 +1,32 @@
 from PySide6.QtCore import QTimer, Signal, QObject
 
+
 class DelayManager(QObject):
     delay_completed = Signal()
     remaining_time_changed = Signal(int)
 
     def __init__(self):
         super().__init__()
-        self.timer = QTimer()
-        self.timer.setSingleShot(True)
-        self.timer.timeout.connect(self.on_complete)
         self.remaining_time = 0
-    
+        self.paused = False
+
     def start_delay(self, delay):
-        self.remaining_time  = delay
-        self.timer.start(delay)
+        self.remaining_time = delay
         self.update_timer()
-    
+
     def pause_resume(self):
-        if self.timer.isActive():
-            self.timer.stop()
-        else:
-            self.timer.start(self.remaining_time)
+        if self.paused:
+            self.paused = False
             self.update_timer()
+        else:
+            self.paused = True
         
     def update_timer(self):
-        if self.timer.isActive():
+        if not self.paused: # CORRIGIR ESSA LOGICA
             if self.remaining_time > 0:
                 self.remaining_time -= 100
+                self.remaining_time_changed.emit(self.remaining_time)
                 QTimer.singleShot(100, self.update_timer)
-            self.remaining_time_changed.emit(self.remaining_time)
+            else:
+                self.delay_completed.emit()
 
-    def on_complete(self):
-        self.delay_completed.emit()
