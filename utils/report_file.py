@@ -1,11 +1,12 @@
 from datetime import datetime
 
+
 def generate_report_file(file_path, data):
     divider = "|" + "=" * 67 + "|\n"
     group = data.get("group")
     model = data.get("model")
     customer = data.get("customer")
-    sn = data.get("series_number")
+    sn = data.get("serial_number")
     test_date = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     operator = data.get("operator")
     steps = data.get("steps")
@@ -31,15 +32,11 @@ def generate_report_file(file_path, data):
             power_line = "|Power: " + " " * 7
             for channel in step["channels"]:
                 chs_line += f"[Channel {channel['channel_id']}]=="
-                loadcurr_line += f"[ {channel['curr']+' '*(8-len(channel['curr']))}]A "
-                upper_line += (
-                    f"[ {channel['maxVolt']+' '*(8-len(channel['maxVolt']))}]V "
-                )
-                lower_line += (
-                    f"[ {channel['minVolt']+' '*(8-len(channel['minVolt']))}]V "
-                )
+                loadcurr_line += f"[ {channel['load']+' '*(8-len(channel['load']))}]A "
+                upper_line += f"[ {channel['vmax']+' '*(8-len(channel['vmax']))}]V "
+                lower_line += f"[ {channel['vmin']+' '*(8-len(channel['vmin']))}]V "
                 outcome_line += (
-                    f"[ {channel['outcome']+' '*(8-len(channel['outcome']))}]V "
+                    f"[ {channel['output']+' '*(8-len(channel['output']))}]V "
                 )
                 power_line += f"[ {channel['power']+' '*(8-len(channel['power']))}]W "
 

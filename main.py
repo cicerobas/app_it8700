@@ -36,10 +36,12 @@ from widgets.data_input_dialog import DataInputDialog
 from utils.delay_manager import DelayManager
 from utils.enums import *
 from utils.monitor_worker import MonitorWorker
+from utils.report_file import *
 
 
 class CurrentTestSetup:
     active_test: Test = None
+    directory_path: str = ""
     serial_number: str = None
     operator_name: str = ""
     channels: list[ChannelMonitor] = []
@@ -213,7 +215,7 @@ class MainWindow(QMainWindow):
             model=self.test_setup.active_test.model,
             customer=self.test_setup.active_test.customer,
             operator=self.operator_name.text(),
-            series_number=self.sn_value.text(),
+            serial_number=self.sn_value.text(),
             steps=[],
         )
 
@@ -283,9 +285,12 @@ class MainWindow(QMainWindow):
 
             self.update_status_label()
             self.reset_setup()
-            # GERAR ARQUIVO
 
-            print("Teste Encerrado")  # FIM
+            if self.state is TestState.PASSED:
+                generate_report_file(
+                    f"{self.test_setup.directory_path}{self.test_setup.serial_number}.txt",
+                    self.test_setup.test_result_data,
+                )
 
     def set_fixed_step_values(self, step: Step):
         for monitor in self.test_setup.channels:
@@ -360,11 +365,11 @@ class MainWindow(QMainWindow):
             current_step_data.append(
                 dict(
                     channel_id=str(channel.channel_id),
-                    output=str(channel.data.output),
+                    output=str("%.2f" % channel.data.output),
                     vmax=str(channel.data.vmax),
                     vmin=str(channel.data.vmin),
                     load=str(channel.data.load),
-                    power=str(channel.data.power),
+                    power=str("%.2f" % channel.data.power),
                 )
             )
 
@@ -460,20 +465,22 @@ class MainWindow(QMainWindow):
         self.steps_table.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
 
     def open_test_file(self):
-        fileName = QFileDialog.getOpenFileName(
+        file_path = QFileDialog.getOpenFileName(
             self, filter="*.json", caption="Abrir arquivo de teste..."
         )[0]
-        if fileName != "":
-            with open(fileName) as loaded_file:
+        if file_path != "":
+            with open(file_path) as loaded_file:
                 test_data = json.load(loaded_file)
+
             try:
                 self.test_setup.active_test = Test(**test_data)
             except:
                 show_custom_dialog(
-                    self, f"Arquivo inválido\n{fileName}", QMessageBox.Critical
+                    self, f"Arquivo inválido\n{file_path}", QMessageBox.Critical
                 )
 
         if self.test_setup.active_test is not None:
+            self.test_setup.directory_path = file_path[: file_path.rindex("/") + 1]
             self.setup_test_details()
 
     def update_status_label(self, step_description: str = ""):
@@ -505,10 +512,6 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         if self.monitoring_worker is not None:
             self.monitoring_worker.stop()
-        # if self.sat_controller.conn_status:
-        #     self.sat_controller.inst_resource.close()
-        # if self.arduino_controller.arduino is not None:
-        #     self.arduino_controller.arduino.conn.close()
 
         event.accept()
 
