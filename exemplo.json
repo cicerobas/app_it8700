@@ -78,6 +78,346 @@
                     "load": 1.2
                 }
             ]
+        },
+        {
+            "type": 1,
+            "description": "Teste 1",
+            "duration": 2.0,
+            "input_source": 1,
+            "channels_setup": [
+                {
+                    "id": 3,
+                    "minVolt": 20.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                },
+                {
+                    "id": 4,
+                    "minVolt": 20.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                }
+            ]
+        },
+        {
+            "type": 1,
+            "description": "Teste 2",
+            "duration": 2.0,
+            "input_source": 1,
+            "channels_setup": [
+                {
+                    "id": 3,
+                    "minVolt": 20.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                },
+                {
+                    "id": 4,
+                    "minVolt": 20.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                }
+            ]
+        },
+        {
+            "type": 1,
+            "description": "Teste 3",
+            "duration": 2.0,
+            "input_source": 1,
+            "channels_setup": [
+                {
+                    "id": 3,
+                    "minVolt": 20.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                },
+                {
+                    "id": 4,
+                    "minVolt": 20.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                }
+            ]
+        },
+        {
+            "type": 1,
+            "description": "Teste 4",
+            "duration": 2.0,
+            "input_source": 1,
+            "channels_setup": [
+                {
+                    "id": 3,
+                    "minVolt": 20.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                },
+                {
+                    "id": 4,
+                    "minVolt": 20.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                }
+            ]
+        },
+        {
+            "type": 1,
+            "description": "Teste 5",
+            "duration": 2.0,
+            "input_source": 1,
+            "channels_setup": [
+                {
+                    "id": 3,
+                    "minVolt": 20.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                },
+                {
+                    "id": 4,
+                    "minVolt": 20.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                }
+            ]
+        },
+        {
+            "type": 1,
+            "description": "Teste 6",
+            "duration": 2.0,
+            "input_source": 1,
+            "channels_setup": [
+                {
+                    "id": 3,
+                    "minVolt": 20.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                },
+                {
+                    "id": 4,
+                    "minVolt": 20.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                }
+            ]
+        },
+        {
+            "type": 1,
+            "description": "Teste 7",
+            "duration": 2.0,
+            "input_source": 1,
+            "channels_setup": [
+                {
+                    "id": 3,
+                    "minVolt": 20.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                },
+                {
+                    "id": 4,
+                    "minVolt": 20.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                }
+            ]
+        },
+        {
+            "type": 1,
+            "description": "Teste 8",
+            "duration": 2.0,
+            "input_source": 1,
+            "channels_setup": [
+                {
+                    "id": 3,
+                    "minVolt": 20.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                },
+                {
+                    "id": 4,
+                    "minVolt": 20.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                }
+            ]
+        },
+        {
+            "type": 1,
+            "description": "Teste 9",
+            "duration": 2.0,
+            "input_source": 1,
+            "channels_setup": [
+                {
+                    "id": 3,
+                    "minVolt": 20.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                },
+                {
+                    "id": 4,
+                    "minVolt": 20.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                }
+            ]
+        },
+        {
+            "type": 1,
+            "description": "Teste 10",
+            "duration": 2.0,
+            "input_source": 1,
+            "channels_setup": [
+                {
+                    "id": 3,
+                    "minVolt": 20.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                },
+                {
+                    "id": 4,
+                    "minVolt": 20.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                }
+            ]
+        },
+        {
+            "type": 1,
+            "description": "Teste 11",
+            "duration": 2.0,
+            "input_source": 1,
+            "channels_setup": [
+                {
+                    "id": 3,
+                    "minVolt": 20.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                },
+                {
+                    "id": 4,
+                    "minVolt": 20.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                }
+            ]
+        },
+        {
+            "type": 1,
+            "description": "Teste 12",
+            "duration": 2.0,
+            "input_source": 1,
+            "channels_setup": [
+                {
+                    "id": 3,
+                    "minVolt": 20.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                },
+                {
+                    "id": 4,
+                    "minVolt": 20.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                }
+            ]
+        },
+        {
+            "type": 1,
+            "description": "Teste 13",
+            "duration": 2.0,
+            "input_source": 1,
+            "channels_setup": [
+                {
+                    "id": 3,
+                    "minVolt": 20.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                },
+                {
+                    "id": 4,
+                    "minVolt": 20.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                }
+            ]
+        },
+        {
+            "type": 1,
+            "description": "Teste 14",
+            "duration": 2.0,
+            "input_source": 1,
+            "channels_setup": [
+                {
+                    "id": 3,
+                    "minVolt": 20.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                },
+                {
+                    "id": 4,
+                    "minVolt": 20.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                }
+            ]
+        },
+        {
+            "type": 1,
+            "description": "Teste 15",
+            "duration": 2.0,
+            "input_source": 1,
+            "channels_setup": [
+                {
+                    "id": 3,
+                    "minVolt": 20.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                },
+                {
+                    "id": 4,
+                    "minVolt": 20.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                }
+            ]
+        },
+        {
+            "type": 1,
+            "description": "Teste 16",
+            "duration": 2.0,
+            "input_source": 1,
+            "channels_setup": [
+                {
+                    "id": 3,
+                    "minVolt": 20.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                },
+                {
+                    "id": 4,
+                    "minVolt": 20.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                }
+            ]
+        },
+        {
+            "type": 1,
+            "description": "Teste 17",
+            "duration": 2.0,
+            "input_source": 1,
+            "channels_setup": [
+                {
+                    "id": 3,
+                    "minVolt": 20.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                },
+                {
+                    "id": 4,
+                    "minVolt": 20.0,
+                    "maxVolt": 30.0,
+                    "load": 0.0
+                }
+            ]
         }
     ]
 }

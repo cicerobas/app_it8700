@@ -12,21 +12,22 @@ class DelayManager(QObject):
 
     def start_delay(self, delay):
         self.remaining_time = delay
-        self.update_timer()
+        self.run_timer()
 
     def pause_resume(self):
         if self.paused:
             self.paused = False
-            self.update_timer()
+            self.run_timer()
         else:
             self.paused = True
         
-    def update_timer(self):
-        if not self.paused: # CORRIGIR ESSA LOGICA
-            if self.remaining_time > 0:
-                self.remaining_time -= 100
-                self.remaining_time_changed.emit(self.remaining_time)
-                QTimer.singleShot(100, self.update_timer)
-            else:
-                self.delay_completed.emit()
+    def run_timer(self):
+        if self.paused:
+            return
+        if self.remaining_time > 0:
+            self.remaining_time -= 100
+            self.remaining_time_changed.emit(self.remaining_time)
+            QTimer.singleShot(100, self.run_timer)
+        else:
+            self.delay_completed.emit()
 

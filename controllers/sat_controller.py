@@ -23,6 +23,7 @@ class ElectronicLoadController:
             self.inst_id = id_response.strip()
             inst.write(SYSTEM_REMOTE)
             inst.write(CLEAR_STATUS)
+            
             return inst
 
         return None

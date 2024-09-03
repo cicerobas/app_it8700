@@ -61,10 +61,9 @@ class ArduinoController:
             self.output_pins[pin] = pin == active_pin
         self.set_acctive_pin(False)
 
-    def buzzer(self) -> bool:
+    def buzzer(self) -> None:
         self.arduino.set_pin_mode("10", "O")
         sleep(0.5)
         self.arduino.digital_write("10", 1)
         sleep(0.5)
         self.arduino.digital_write("10", 0)
-        return True
