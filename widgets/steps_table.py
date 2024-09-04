@@ -12,9 +12,9 @@ class StepsTable(QTableWidget):
         self.setRowCount(0)
         self.setColumnCount(3)
         self.setHorizontalHeaderLabels(["Descrição", "Tempo", "Status"])
-        self.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.setSelectionBehavior(QTableWidget.SelectRows)
-        self.setSelectionMode(QTableWidget.SingleSelection)
+        self.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
 
     def update_step_list(self, steps: list[Step]) -> None:
@@ -22,9 +22,9 @@ class StepsTable(QTableWidget):
         for row, step in enumerate(steps):
             self.insertRow(row)
             duration = QTableWidgetItem(str(step.duration))
-            duration.setTextAlignment(Qt.AlignCenter)
             status = QTableWidgetItem("---")
-            status.setTextAlignment(Qt.AlignCenter)
+            duration.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            status.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
             self.setItem(row, 0, QTableWidgetItem(step.description))
             self.setItem(row, 1, duration)
@@ -33,23 +33,23 @@ class StepsTable(QTableWidget):
     def set_selected_step(self, index: int):
         self.selectRow(index)
 
-    def update_duration(self, new_value: str):
-        item = QTableWidgetItem(new_value)
-        item.setTextAlignment(Qt.AlignCenter)
+    def update_duration(self, new_value):
+        item = QTableWidgetItem(str(new_value))
+        item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setItem(self.currentRow(), 1, item)
 
     def set_step_status(self, status: bool):
         item = QTableWidgetItem("PASS" if status else "FAIL")
-        item.setTextAlignment(Qt.AlignCenter)
+        item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         item.setForeground(QBrush(QColor("green" if status else "red")))
         self.setItem(self.currentRow(), 2, item)
 
-    def reset_table(self):
+    def reset_table_status_fields(self):
         row = 0
         self.clearSelection()
         while row < self.rowCount():
             status = QTableWidgetItem("---")
-            status.setTextAlignment(Qt.AlignCenter)
+            status.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             status.setForeground(QBrush(QColor("black")))
             self.setItem(row, 2, status)
             row += 1

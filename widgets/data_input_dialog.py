@@ -11,14 +11,15 @@ class DataInputDialog(QDialog):
 
         self.number_input = QLineEdit()
         self.number_input.setValidator(QIntValidator(0, 99999999, self))  # Aceita números até 8 dígitos
-        layout.addRow(QLabel("Nº de série:"), self.number_input)
-
         self.operator_input = QLineEdit()
+
+        layout.addRow(QLabel("Nº de série:"), self.number_input)
         layout.addRow(QLabel("Operador:"), self.operator_input)
 
         self.button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
         self.button_box.accepted.connect(self.accept)
         self.button_box.rejected.connect(self.reject)
+        
         layout.addWidget(self.button_box)
 
     def get_values(self):

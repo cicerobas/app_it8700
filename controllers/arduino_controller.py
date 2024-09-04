@@ -1,7 +1,7 @@
 import pyvisa
 from time import sleep
 
-import utils.pyduino as pyduino
+from utils.arduino_interface import Arduino
 
 # Default instrument path for Arduino.
 ARDU_INST_PATH = "ASRL/dev/ttyACM0::INSTR"
@@ -16,7 +16,7 @@ class ArduinoController:
         self.rm = pyvisa.ResourceManager()
         self.arduino = None
         if ARDU_INST_PATH in self.rm.list_resources():
-            self.arduino = pyduino.Arduino()
+            self.arduino = Arduino()
 
         self.output_pins = {
             "4": False,
@@ -61,9 +61,10 @@ class ArduinoController:
             self.output_pins[pin] = pin == active_pin
         self.set_acctive_pin(False)
 
-    def buzzer(self) -> None:
+    def buzzer(self) -> bool:
         self.arduino.set_pin_mode("10", "O")
         sleep(0.5)
         self.arduino.digital_write("10", 1)
         sleep(0.5)
         self.arduino.digital_write("10", 0)
+        return True

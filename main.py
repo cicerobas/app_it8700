@@ -1,4 +1,5 @@
 import sys
+import os
 import json
 from time import sleep
 
@@ -34,8 +35,8 @@ from widgets.channel_monitor import ChannelMonitor
 from widgets.steps_table import StepsTable
 from widgets.data_input_dialog import DataInputDialog
 from utils.delay_manager import DelayManager
-from utils.enums import *
 from utils.monitor_worker import MonitorWorker
+from utils.enums import *
 from utils.report_file import *
 
 
@@ -74,10 +75,8 @@ class MainWindow(QMainWindow):
         self.thread_pool = QThreadPool()
         self.worker_signals = WorkerSignals()
         self.delay_manager = DelayManager()
+        self.steps_table = StepsTable()
         self.monitoring_worker = None
-        self.delay_manager.delay_completed.connect(self.on_delay_completed)
-        self.delay_manager.remaining_time_changed.connect(self.update_timer)
-        self.worker_signals.update_output.connect(self.update_output_display)
 
         self.setMinimumSize(QSize(1200, 600))
         self.setWindowTitle(
@@ -86,13 +85,18 @@ class MainWindow(QMainWindow):
             else "CEBRA - IT8700 Sem Conexão"
         )
 
+        # Signals
+        self.delay_manager.delay_completed.connect(self.on_delay_completed)
+        self.delay_manager.remaining_time_changed.connect(self.update_timer)
+        self.worker_signals.update_output.connect(self.update_output_display)
+
         # Shortcuts
         self.start_shortcut = QShortcut(QKeySequence("Alt+R"), self)
         self.pause_shortcut = QShortcut(QKeySequence("Alt+P"), self)
         self.stop_shortcut = QShortcut(QKeySequence("Alt+S"), self)
         self.single_run_shortcut = QShortcut(QKeySequence("Ctrl+R"), self)
         self.start_shortcut.activated.connect(self.start_test_sequence)
-        self.pause_shortcut.activated.connect(self.pause_test_sequence)
+        self.pause_shortcut.activated.connect(self.toggle_test_pause)
         self.stop_shortcut.activated.connect(self.cancel_test_sequence)
         self.single_run_shortcut.activated.connect(self.handle_single__run)
 
@@ -114,87 +118,86 @@ class MainWindow(QMainWindow):
         logo.setFixedSize(150, 100)
 
         # Labels
-        group_label = QLabel("Grupo: ")
-        model_label = QLabel("Modelo: ")
-        sn_label = QLabel("Nº de Serie: ")
-        operator_label = QLabel("Operador: ")
-        self.status_label = QLabel("---")
-
-        self.group_value = QLineEdit()
-        self.model_value = QLineEdit()
-        self.sn_value = QLineEdit()
-        self.operator_name = QLineEdit()
-
-        label_font = QFont("Arial", 16)
-        group_label.setFont(label_font)
-        model_label.setFont(label_font)
-        sn_label.setFont(label_font)
-        operator_label.setFont(label_font)
-        self.status_label.setFont(QFont("Arial", 24, QFont.Bold))
-        self.status_label.setContentsMargins(50, 0, 50, 0)
-        self.status_label.setAlignment(
+        group_label = default_header_label("Grupo: ")
+        model_label = default_header_label("Modelo: ")
+        serial_number_label = default_header_label("Nº de Serie: ")
+        operator_name_label = default_header_label("Operador: ")
+        self.test_status_label = QLabel("---")
+        self.test_status_label.setFont(QFont("Arial", 24, QFont.Weight.Bold))
+        self.test_status_label.setContentsMargins(50, 0, 50, 0)
+        self.test_status_label.setAlignment(
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
         )
 
-        self.group_value.setReadOnly(True)
-        self.group_value.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.model_value.setReadOnly(True)
-        self.model_value.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.sn_value.setValidator(QIntValidator(0, 99999999, self))
-        self.sn_value.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
-        self.operator_name.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+        # Fields
+        self.group_value_field = default_header_field(True, Qt.FocusPolicy.NoFocus)
+        self.model_value_field = default_header_field(True, Qt.FocusPolicy.NoFocus)
+        self.serial_number_value_field = default_header_field(
+            False, Qt.FocusPolicy.ClickFocus
+        )
+        self.operator_name_value_field = default_header_field(
+            False, Qt.FocusPolicy.ClickFocus
+        )
+        self.serial_number_value_field.setValidator(QIntValidator(0, 99999999, self))
 
-        self.sn_value.textEdited.connect(self.sn_changed)
-        self.operator_name.textEdited.connect(self.op_name_changed)
+        self.serial_number_value_field.textEdited.connect(self.serial_number_changed)
+        self.operator_name_value_field.textEdited.connect(self.operator_name_changed)
 
         # Test Details Layout
-        info_panel = QGridLayout()
-        info_panel.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        info_panel.setColumnMinimumWidth(2, 50)
-        info_panel.addWidget(group_label, 0, 0)
-        info_panel.addWidget(self.group_value, 0, 1)
-        info_panel.addWidget(model_label, 1, 0)
-        info_panel.addWidget(self.model_value, 1, 1)
-        info_panel.addWidget(sn_label, 0, 3)
-        info_panel.addWidget(self.sn_value, 0, 4)
-        info_panel.addWidget(operator_label, 1, 3)
-        info_panel.addWidget(self.operator_name, 1, 4)
+        g_info_panel_layout = QGridLayout()
+        g_info_panel_layout.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        g_info_panel_layout.setColumnMinimumWidth(2, 50)
+        g_info_panel_layout.addWidget(group_label, 0, 0)
+        g_info_panel_layout.addWidget(self.group_value_field, 0, 1)
+        g_info_panel_layout.addWidget(model_label, 1, 0)
+        g_info_panel_layout.addWidget(self.model_value_field, 1, 1)
+        g_info_panel_layout.addWidget(serial_number_label, 0, 3)
+        g_info_panel_layout.addWidget(self.serial_number_value_field, 0, 4)
+        g_info_panel_layout.addWidget(operator_name_label, 1, 3)
+        g_info_panel_layout.addWidget(self.operator_name_value_field, 1, 4)
 
         # Header
-        header_layout = QHBoxLayout()
-        header_layout.addWidget(logo)
-        header_layout.addSpacing(20)
-        header_layout.addLayout(info_panel)
-        header_layout.addWidget(self.status_label, Qt.AlignmentFlag.AlignRight)
+        h_header_layout = QHBoxLayout()
+        h_header_layout.addWidget(logo)
+        h_header_layout.addSpacing(20)
+        h_header_layout.addLayout(g_info_panel_layout)
+        h_header_layout.addWidget(self.test_status_label, Qt.AlignmentFlag.AlignRight)
 
-        # Body and Main Layouts
-        self.steps_table = StepsTable()
-        self.body_layout = QHBoxLayout()
-        self.channels_layout = QVBoxLayout()
-        self.channels_layout.setAlignment(Qt.AlignRight | Qt.AlignTop)
-        self.channels_layout.setSpacing(20)
-        self.body_layout.addWidget(self.steps_table)
-        self.body_layout.addLayout(self.channels_layout)
-        main_layout = QVBoxLayout()
-        main_layout.setAlignment(Qt.AlignTop)
-        main_layout.addLayout(header_layout)
-        main_layout.addLayout(self.body_layout)
-        main_widget = QWidget()
-        main_widget.setLayout(main_layout)
-        self.setCentralWidget(main_widget)
+        # Main Container Layouts
+        main_container_widget = QWidget()
+        h_content_layout = QHBoxLayout()
+        self.v_channels_display_layout = QVBoxLayout()
+        v_main_container_layout = QVBoxLayout()
+
+        self.v_channels_display_layout.setAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop
+        )
+        self.v_channels_display_layout.setSpacing(20)
+
+        h_content_layout.addWidget(self.steps_table)
+        h_content_layout.addLayout(self.v_channels_display_layout)
+
+        v_main_container_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        v_main_container_layout.addLayout(h_header_layout)
+        v_main_container_layout.addLayout(h_content_layout)
+
+        main_container_widget.setLayout(v_main_container_layout)
+        self.setCentralWidget(main_container_widget)
 
     def start_test_sequence(self):
         if self.state in [TestState.RUNNING, TestState.PAUSED, TestState.WAITKEY]:
             return
         if not self.sat_controller.conn_status:
-            show_custom_dialog(self, "SAT IT8700 - Sem Conexão", QMessageBox.Critical)
+            show_custom_dialog(
+                self, "SAT IT8700 - Sem Conexão", QMessageBox.Icon.Critical
+            )
             return
         if not self.arduino_controller.check_connection():
-            show_custom_dialog(self, "Arduino - Sem Conexão", QMessageBox.Critical)
+            show_custom_dialog(self, "Arduino - Sem Conexão", QMessageBox.Icon.Critical)
             return
         if self.test_setup.active_test is None:
             show_custom_dialog(
-                self, "Carregue um Arquivo de Teste", QMessageBox.Information
+                self, "Carregue um Arquivo de Teste", QMessageBox.Icon.Information
             )
             return
         if self.test_setup.serial_number is None:
@@ -214,8 +217,8 @@ class MainWindow(QMainWindow):
             group=self.test_setup.active_test.group,
             model=self.test_setup.active_test.model,
             customer=self.test_setup.active_test.customer,
-            operator=self.operator_name.text(),
-            serial_number=self.sn_value.text(),
+            operator=self.operator_name_value_field.text(),
+            serial_number=self.serial_number_value_field.text(),
             steps=[],
         )
 
@@ -223,25 +226,24 @@ class MainWindow(QMainWindow):
             self.test_setup.get_active_channel_ids(), True
         )
         if self.state is not TestState.NONE:
-            self.steps_table.reset_table()
+            self.steps_table.reset_table_status_fields()
 
         self.open_file_action.setDisabled(True)
+        self.serial_number_value_field.setReadOnly(True)
+        self.operator_name_value_field.setReadOnly(True)
         self.state = TestState.RUNNING
+        self.test_setup.current_index = 0
         self.update_status_label()
         self.start_monitoring()
-        self.test_setup.current_index = 0
         self.run_steps()
 
-    def pause_test_sequence(self):
+    def toggle_test_pause(self):
         if self.state not in [TestState.RUNNING, TestState.PAUSED]:
             return
         self.delay_manager.pause_resume()
-        match self.state:
-            case TestState.PAUSED:
-                self.state = TestState.RUNNING
-            case TestState.RUNNING:
-                self.state = TestState.PAUSED
-
+        self.state = (
+            TestState.RUNNING if self.state is TestState.PAUSED else TestState.PAUSED
+        )
         self.update_status_label()
 
     def cancel_test_sequence(self):
@@ -279,26 +281,26 @@ class MainWindow(QMainWindow):
                 self.state = (
                     TestState.PASSED
                     if False not in self.test_setup.test_sequence_status
-                    and not self.test_setup.is_single_step
                     else TestState.FAILED
                 )
 
-            self.update_status_label()
-            self.reset_setup()
-
-            if self.state is TestState.PASSED:
+            if self.state is TestState.PASSED and not self.test_setup.is_single_step:
                 generate_report_file(
                     f"{self.test_setup.directory_path}{self.test_setup.serial_number}.txt",
                     self.test_setup.test_result_data,
-                )
+                )  # TODO:CRIAR LOG PARA EXIBIR RESULTADOS FALHOS
+            
+            self.update_status_label()
+            self.reset_setup()
 
     def set_fixed_step_values(self, step: Step):
+        channel_dict = {channel.id: channel for channel in step.channels_setup}
         for monitor in self.test_setup.channels:
-            for channel in step.channels_setup:
-                if monitor.channel_id == channel.id:
-                    monitor.update_fixed_values(
-                        [channel.maxVolt, channel.minVolt, channel.load]
-                    )
+            if monitor.channel_id in channel_dict:
+                channel = channel_dict[monitor.channel_id]
+                monitor.update_fixed_values(
+                    [channel.maxVolt, channel.minVolt, channel.load]
+                )
 
     def set_input_source(self, input_source: int) -> None:
         """
@@ -310,22 +312,24 @@ class MainWindow(QMainWindow):
         - Pino 9: CC3
         - Pino 10: Buzzer
         """
-        if self.test_setup.active_input_source != input_source:
-            input_type = self.test_setup.active_test.input_type
-            match input_source:
-                case 1:
-                    self.arduino_controller.change_output(
-                        "4" if input_type == "CA" else "7"
-                    )
-                case 2:
-                    self.arduino_controller.change_output(
-                        "5" if input_type == "CA" else "8"
-                    )
-                case 3:
-                    self.arduino_controller.change_output(
-                        "6" if input_type == "CA" else "9"
-                    )
-            self.test_setup.active_input_source = input_source
+        if self.test_setup.active_input_source == input_source:
+            return
+
+        input_type = self.test_setup.active_test.input_type
+        match input_source:
+            case 1:
+                self.arduino_controller.change_output(
+                    "4" if input_type == "CA" else "7"
+                )
+            case 2:
+                self.arduino_controller.change_output(
+                    "5" if input_type == "CA" else "8"
+                )
+            case 3:
+                self.arduino_controller.change_output(
+                    "6" if input_type == "CA" else "9"
+                )
+        self.test_setup.active_input_source = input_source
 
     def set_channels_load(self, step: Step):
         for channel in step.channels_setup:
@@ -344,40 +348,36 @@ class MainWindow(QMainWindow):
             self.test_setup.current_index += 1
             self.run_steps()
 
-    def handle_test_data(self, data: tuple):
-        self.test_setup.test_result_data["steps"].append(
-            dict(
-                description=self.test_setup.active_test.steps[
-                    self.test_setup.current_index
-                ].description,
-                channels=data,
-            )
-        )
+    def handle_test_data(self, data: tuple) -> None:
+        current_step = self.test_setup.active_test.steps[self.test_setup.current_index]
+        step_data = {
+            "description": current_step.description,
+            "channels": data,
+        }
+        self.test_setup.test_result_data["steps"].append(step_data)
 
     def validate_step_values(self) -> tuple:
         step_pass = True
         current_step_data = []
 
         for channel in self.test_setup.channels:
-            step_pass = (
-                channel.data.vmin <= channel.data.output <= channel.data.vmax
-            ) and step_pass
-            current_step_data.append(
-                dict(
-                    channel_id=str(channel.channel_id),
-                    output=str("%.2f" % channel.data.output),
-                    vmax=str(channel.data.vmax),
-                    vmin=str(channel.data.vmin),
-                    load=str(channel.data.load),
-                    power=str("%.2f" % channel.data.power),
-                )
-            )
+            channel_data = {
+                "channel_id": str(channel.channel_id),
+                "output": channel.data.output,
+                "vmax": channel.data.vmax,
+                "vmin": channel.data.vmin,
+                "load": channel.data.load,
+                "power": channel.data.power,
+            }
+
+            current_step_data.append(channel_data)
+            if not (channel.data.vmin <= channel.data.output <= channel.data.vmax):
+                step_pass = False
 
         self.steps_table.set_step_status(step_pass)
         self.test_setup.test_sequence_status.append(step_pass)
-        channels_data = tuple((current_step_data))
-        current_step_data.clear()
-        return channels_data
+
+        return tuple(current_step_data)
 
     def handle_single__run(self):
         if self.steps_table.currentRow() >= 0:
@@ -394,6 +394,8 @@ class MainWindow(QMainWindow):
         self.delay_manager.paused = False
         self.delay_manager.remaining_time = 0
         self.open_file_action.setDisabled(False)
+        self.serial_number_value_field.setReadOnly(False)
+        self.operator_name_value_field.setReadOnly(False)
         self.test_setup.test_sequence_status.clear()
         self.test_setup.serial_number_changed = False
         self.test_setup.is_single_step = False
@@ -401,9 +403,10 @@ class MainWindow(QMainWindow):
         self.test_setup.active_input_source = 0
         self.test_setup.current_index = 0
         self.steps_table.clearSelection()
-        self.steps_table.reset_table()
+        self.steps_table.reset_table_status_fields()
 
-        self.arduino_controller.buzzer()
+        while not self.arduino_controller.buzzer():
+            sleep(0.1)  # VERIFICAR DELAY
 
     @Slot()
     def start_monitoring(self):
@@ -415,26 +418,28 @@ class MainWindow(QMainWindow):
 
     @Slot(int)
     def update_timer(self, remaining_time):
-        self.steps_table.update_duration(str(remaining_time / 1000))
+        self.steps_table.update_duration(remaining_time / 1000)
 
     @Slot()
     def update_output_display(self):
         for channel in self.test_setup.channels:
-            channel.update_output(
+            channel.update_output_value(
                 self.sat_controller.get_channel_value(channel.channel_id)
             )
 
-    def sn_changed(self):
-        self.test_setup.serial_number = str(int(self.sn_value.text())).zfill(8)
-        self.sn_value.setText(self.test_setup.serial_number)
+    def serial_number_changed(self):
+        self.test_setup.serial_number = str(
+            int(self.serial_number_value_field.text())
+        ).zfill(8)
+        self.update_test_info()
         self.test_setup.serial_number_changed = True
 
-    def op_name_changed(self):
-        self.test_setup.operator_name = self.operator_name.text()
+    def operator_name_changed(self):
+        self.test_setup.operator_name = self.operator_name_value_field.text()
 
     def update_test_info(self):
-        self.sn_value.setText(self.test_setup.serial_number)
-        self.operator_name.setText(self.test_setup.operator_name)
+        self.serial_number_value_field.setText(self.test_setup.serial_number)
+        self.operator_name_value_field.setText(self.test_setup.operator_name)
 
     def show_test_info_input_dialog(self) -> bool:
         dlg = DataInputDialog(self)
@@ -447,58 +452,68 @@ class MainWindow(QMainWindow):
         return False
 
     def setup_test_details(self):
-        self.group_value.setText(self.test_setup.active_test.group)
-        self.model_value.setText(self.test_setup.active_test.model)
+        self.group_value_field.setText(self.test_setup.active_test.group)
+        self.model_value_field.setText(self.test_setup.active_test.model)
         self.steps_table.update_step_list(self.test_setup.active_test.steps)
 
         for channel in self.test_setup.active_test.active_channels:
             channel_monitor = ChannelMonitor(channel.id)
             self.test_setup.channels.append(channel_monitor)
-            self.channels_layout.addWidget(channel_monitor)
+            self.v_channels_display_layout.addWidget(channel_monitor)
 
         self.steps_table.resizeColumnsToContents()
         total_width = sum(
             self.steps_table.columnWidth(i)
             for i in range(self.steps_table.columnCount())
         )
-        self.steps_table.setFixedWidth(total_width + 30)
-        self.steps_table.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+        self.steps_table.setFixedWidth(total_width + 50)
+        self.steps_table.setSizePolicy(
+            QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding
+        )
 
     def open_test_file(self):
-        file_path = QFileDialog.getOpenFileName(
-            self, filter="*.json", caption="Abrir arquivo de teste..."
-        )[0]
-        if file_path != "":
-            with open(file_path) as loaded_file:
-                test_data = json.load(loaded_file)
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Abrir arquivo de teste...", "", "Arquivos JSON (*.json)"
+        )
 
+        if file_path:
             try:
+                with open(file_path, "r") as loaded_file:
+                    test_data = json.load(loaded_file)
                 self.test_setup.active_test = Test(**test_data)
-            except:
+            except (json.JSONDecodeError, TypeError, ValueError) as e:
                 show_custom_dialog(
-                    self, f"Arquivo inválido\n{file_path}", QMessageBox.Critical
+                    self,
+                    f"Falha ao abrir arquivo\n{file_path}\nErro: {str(e)}",
+                    QMessageBox.Icon.Critical,
                 )
-
-        if self.test_setup.active_test is not None:
-            self.test_setup.directory_path = file_path[: file_path.rindex("/") + 1]
-            self.setup_test_details()
+            except Exception as e:
+                show_custom_dialog(
+                    self,
+                    f"Falha ao abrir arquivo\n{file_path}\nErro inesperado: {str(e)}",
+                    QMessageBox.Icon.Critical,
+                )
+            else:
+                self.test_setup.directory_path = (
+                    os.path.dirname(file_path) + os.path.sep
+                )
+                self.setup_test_details()
 
     def update_status_label(self, step_description: str = ""):
-        if self.state is TestState.WAITKEY:
-            self.status_label.setText(f"{step_description}\n{self.state.value}")
-            self.status_label.setStyleSheet("color:blue;")
-        else:
-            self.status_label.setText(self.state.value)
-            match self.state:
-                case TestState.PASSED | TestState.RUNNING:
-                    color = "green"
-                case TestState.FAILED | TestState.CANCELED:
-                    color = "red"
-                case TestState.PAUSED:
-                    color = "orange"
-                case _:
-                    color = "black"
-            self.status_label.setStyleSheet(f"color:{color};")
+        status_text = f"{step_description}\n{self.state.value}"
+        self.test_status_label.setText(status_text.lstrip())
+        match self.state:
+            case TestState.PASSED | TestState.RUNNING:
+                color = "green"
+            case TestState.FAILED | TestState.CANCELED:
+                color = "red"
+            case TestState.PAUSED:
+                color = "orange"
+            case TestState.WAITKEY:
+                color = "blue"
+            case _:
+                color = "black"
+        self.test_status_label.setStyleSheet(f"color:{color};")
 
     def keyPressEvent(self, event: QKeyEvent):
         if self.state is TestState.WAITKEY and event.key() in [
@@ -516,13 +531,28 @@ class MainWindow(QMainWindow):
         event.accept()
 
 
+def default_header_label(text: str) -> QLabel:
+    label = QLabel(text)
+    label.setFont(QFont("Arial", 16))
+    return label
+
+
+def default_header_field(read_only: bool, focus_policy: Qt.FocusPolicy) -> QLineEdit:
+    field = QLineEdit()
+    field.setReadOnly(read_only)
+    field.setFocusPolicy(focus_policy)
+    return field
+
+
 def show_custom_dialog(self, text: str, type: QMessageBox.Icon) -> None:
     dlg = QMessageBox(self)
-    dlg.setWindowTitle("Informação" if type == QMessageBox.Information else "Erro")
+    dlg.setWindowTitle("Informação" if type == QMessageBox.Icon.Information else "Erro")
     dlg.setText(text)
     dlg.setFont(QFont("Arial", 14))
     dlg.setStandardButtons(
-        QMessageBox.Ok if type == QMessageBox.Information else QMessageBox.Close
+        QMessageBox.StandardButton.Ok
+        if type == QMessageBox.Icon.Information
+        else QMessageBox.StandardButton.Close
     )
     dlg.setIcon(type)
     dlg.exec()

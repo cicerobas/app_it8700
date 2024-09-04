@@ -31,14 +31,18 @@ def generate_report_file(file_path, data):
             outcome_line = "|Outcome: " + " " * 5
             power_line = "|Power: " + " " * 7
             for channel in step["channels"]:
+                load = str(channel["load"])
+                vmax = str(channel["vmax"])
+                vmin = str(channel["vmin"])
+                output = str("%.2f" % channel["output"])
+                power = str("%.2f" % channel["power"])
+                
                 chs_line += f"[Channel {channel['channel_id']}]=="
-                loadcurr_line += f"[ {channel['load']+' '*(8-len(channel['load']))}]A "
-                upper_line += f"[ {channel['vmax']+' '*(8-len(channel['vmax']))}]V "
-                lower_line += f"[ {channel['vmin']+' '*(8-len(channel['vmin']))}]V "
-                outcome_line += (
-                    f"[ {channel['output']+' '*(8-len(channel['output']))}]V "
-                )
-                power_line += f"[ {channel['power']+' '*(8-len(channel['power']))}]W "
+                loadcurr_line += f"[ {load+' '*(8-len(load))}]A "
+                upper_line += f"[ {vmax+' '*(8-len(vmax))}]V "
+                lower_line += f"[ {vmin+' '*(8-len(vmin))}]V "
+                outcome_line += f"[ {output+' '*(8-len(output))}]V "
+                power_line += f"[ {power+' '*(8-len(power))}]W "
 
             chs_line += f"{'=' * (68 - len(chs_line))}|\n"
             loadcurr_line += f"{' ' * (68 - len(loadcurr_line))}|\n"
