@@ -66,9 +66,9 @@ class WorkerSignals(QObject):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, test_setup: CurrentTestSetup):
+    def __init__(self):
         super().__init__()
-        self.test_setup = test_setup
+        self.test_setup = CurrentTestSetup()
         self.state = TestState.NONE
         self.sat_controller = ElectronicLoadController()
         self.arduino_controller = ArduinoController()
@@ -289,7 +289,7 @@ class MainWindow(QMainWindow):
                     f"{self.test_setup.directory_path}{self.test_setup.serial_number}.txt",
                     self.test_setup.test_result_data,
                 )  # TODO:CRIAR LOG PARA EXIBIR RESULTADOS FALHOS
-            
+
             self.update_status_label()
             self.reset_setup()
 
@@ -477,6 +477,7 @@ class MainWindow(QMainWindow):
         )
 
         if file_path:
+            self.reset_current_test()
             try:
                 with open(file_path, "r") as loaded_file:
                     test_data = json.load(loaded_file)
@@ -498,6 +499,13 @@ class MainWindow(QMainWindow):
                     os.path.dirname(file_path) + os.path.sep
                 )
                 self.setup_test_details()
+
+    def reset_current_test(self):
+        self.test_setup = CurrentTestSetup()
+        self.update_test_info()
+        while self.v_channels_display_layout.count():
+            item = self.v_channels_display_layout.takeAt(0)
+            item.widget().deleteLater()
 
     def update_status_label(self, step_description: str = ""):
         status_text = f"{step_description}\n{self.state.value}"
@@ -560,6 +568,6 @@ def show_custom_dialog(self, text: str, type: QMessageBox.Icon) -> None:
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = MainWindow(test_setup=CurrentTestSetup())
+    window = MainWindow()
     window.showMaximized()  # .showFullScreen()
     sys.exit(app.exec())
