@@ -22,8 +22,11 @@ def generate_report_file(file_path, data):
         file.write(f"| Tested By: {operator + ' ' * (68-13-len(operator))}|\n")
         for step in steps:
             file.write(divider)
-            desc = step["description"]
-            lines.append(f"|-> {desc + ' ' * (68-4-len(desc))}|\n")
+            description = step["description"]
+            status = step["status"]
+            lines.append(
+                f"|-> {description + ' ' * (55-len(description))}{'[ PASS ]' if status else '[ FAIL ]'} |\n"
+            )
             chs_line = "|" + "=" * 14
             loadcurr_line = "|Load Current: "
             upper_line = "|Upper: " + " " * 7
@@ -36,7 +39,7 @@ def generate_report_file(file_path, data):
                 vmin = str(channel["vmin"])
                 output = str("%.2f" % channel["output"])
                 power = str("%.2f" % channel["power"])
-                
+
                 chs_line += f"[Channel {channel['channel_id']}]=="
                 loadcurr_line += f"[ {load+' '*(8-len(load))}]A "
                 upper_line += f"[ {vmax+' '*(8-len(vmax))}]V "

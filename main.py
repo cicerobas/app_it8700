@@ -344,19 +344,11 @@ class MainWindow(QMainWindow):
 
     def on_delay_completed(self):
         if self.state is not TestState.CANCELED:
-            self.handle_test_data(self.validate_step_values())
+            self.validate_step_values()
             self.test_setup.current_index += 1
             self.run_steps()
 
-    def handle_test_data(self, data: tuple) -> None:
-        current_step = self.test_setup.active_test.steps[self.test_setup.current_index]
-        step_data = {
-            "description": current_step.description,
-            "channels": data,
-        }
-        self.test_setup.test_result_data["steps"].append(step_data)
-
-    def validate_step_values(self) -> tuple:
+    def validate_step_values(self) -> None:
         step_pass = True
         current_step_data = []
 
@@ -376,8 +368,16 @@ class MainWindow(QMainWindow):
 
         self.steps_table.set_step_status(step_pass)
         self.test_setup.test_sequence_status.append(step_pass)
-
-        return tuple(current_step_data)
+        self.handle_test_data(tuple(current_step_data), step_pass)
+    
+    def handle_test_data(self, data: tuple, step_status:bool) -> None:
+        current_step = self.test_setup.active_test.steps[self.test_setup.current_index]
+        step_data = {
+            "description": current_step.description,
+            "status": step_status,
+            "channels": data,
+        }
+        self.test_setup.test_result_data["steps"].append(step_data)
 
     def handle_single__run(self):
         if self.steps_table.currentRow() >= 0:
@@ -403,10 +403,9 @@ class MainWindow(QMainWindow):
         self.test_setup.active_input_source = 0
         self.test_setup.current_index = 0
         self.steps_table.clearSelection()
-        self.steps_table.reset_table_status_fields()
 
         while not self.arduino_controller.buzzer():
-            sleep(0.1)  # VERIFICAR DELAY
+            sleep(0.1)
 
     @Slot()
     def start_monitoring(self):
@@ -422,6 +421,8 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def update_output_display(self):
+        if self.state not in [TestState.RUNNING, TestState.PAUSED]:
+            return
         for channel in self.test_setup.channels:
             channel.update_output_value(
                 self.sat_controller.get_channel_value(channel.channel_id)
