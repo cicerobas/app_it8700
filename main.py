@@ -1,6 +1,7 @@
 import sys
 import os
 import json
+import tempfile
 from time import sleep
 
 from PySide6.QtCore import QSize, Qt, QThreadPool, Slot, Signal, QObject
@@ -34,6 +35,7 @@ from models.test_file_model import *
 from widgets.channel_monitor import ChannelMonitor
 from widgets.steps_table import StepsTable
 from widgets.data_input_dialog import DataInputDialog
+from widgets.test_result_view import TestResultView
 from utils.delay_manager import DelayManager
 from utils.monitor_worker import MonitorWorker
 from utils.enums import *
@@ -76,7 +78,10 @@ class MainWindow(QMainWindow):
         self.worker_signals = WorkerSignals()
         self.delay_manager = DelayManager()
         self.steps_table = StepsTable()
+        self.test_result_view = TestResultView()
         self.monitoring_worker = None
+        self.temp_file = None
+        self.temp_file_name = ""
 
         self.setMinimumSize(QSize(1200, 600))
         self.setWindowTitle(
@@ -104,12 +109,22 @@ class MainWindow(QMainWindow):
         self.open_file_action = QAction(
             QIcon("assets/icons/file_open.png"), "Abrir Arquivo", self
         )
+        self.test_result_action = QAction(
+            QIcon("assets/icons/description.png"), "Resultado", self
+        )
+
+        self.open_file_action.setShortcut(Qt.Key.Key_F3)
+        self.test_result_action.setShortcut(Qt.Key.Key_F8)
+
         self.open_file_action.triggered.connect(self.open_test_file)
+        self.test_result_action.triggered.connect(self.handle_test_result_view)
 
         # Menu
         menu = self.menuBar()
         file_menu = menu.addMenu("&Arquivo")
         file_menu.addAction(self.open_file_action)
+        test_menu = menu.addMenu("&Teste")
+        test_menu.addAction(self.test_result_action)
 
         # Logo
         logo = QLabel()
@@ -277,6 +292,10 @@ class MainWindow(QMainWindow):
 
             self.handle_step_delay(step)
         else:
+            if self.temp_file:
+                self.temp_file.close()
+                os.remove(self.temp_file.name)
+
             if self.state is not TestState.CANCELED:
                 self.state = (
                     TestState.PASSED
@@ -284,11 +303,17 @@ class MainWindow(QMainWindow):
                     else TestState.FAILED
                 )
 
+            self.temp_file = generate_report_file(self.test_setup.test_result_data)
+            self.temp_file_name = self.temp_file.name
+            self.test_result_view.text = self.read_temp_file()
+
             if self.state is TestState.PASSED and not self.test_setup.is_single_step:
-                generate_report_file(
-                    f"{self.test_setup.directory_path}{self.test_setup.serial_number}.txt",
-                    self.test_setup.test_result_data,
-                )  # TODO:CRIAR LOG PARA EXIBIR RESULTADOS FALHOS
+                with open(
+                    file=f"{self.test_setup.directory_path}{self.test_setup.serial_number}.txt",
+                    mode="w",
+                    encoding="utf-8",
+                ) as test_file:
+                    test_file.write(self.read_temp_file())
 
             self.update_status_label()
             self.reset_setup()
@@ -369,8 +394,8 @@ class MainWindow(QMainWindow):
         self.steps_table.set_step_status(step_pass)
         self.test_setup.test_sequence_status.append(step_pass)
         self.handle_test_data(tuple(current_step_data), step_pass)
-    
-    def handle_test_data(self, data: tuple, step_status:bool) -> None:
+
+    def handle_test_data(self, data: tuple, step_status: bool) -> None:
         current_step = self.test_setup.active_test.steps[self.test_setup.current_index]
         step_data = {
             "description": current_step.description,
@@ -421,8 +446,6 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def update_output_display(self):
-        if self.state not in [TestState.RUNNING, TestState.PAUSED]:
-            return
         for channel in self.test_setup.channels:
             channel.update_output_value(
                 self.sat_controller.get_channel_value(channel.channel_id)
@@ -523,6 +546,14 @@ class MainWindow(QMainWindow):
             case _:
                 color = "black"
         self.test_status_label.setStyleSheet(f"color:{color};")
+
+    def read_temp_file(self) -> str:
+        if self.temp_file:
+            with open(self.temp_file_name, "r", encoding="utf-8") as file:
+                return file.read()
+
+    def handle_test_result_view(self):
+        self.test_result_view.show()
 
     def keyPressEvent(self, event: QKeyEvent):
         if self.state is TestState.WAITKEY and event.key() in [
