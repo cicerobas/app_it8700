@@ -39,7 +39,8 @@ class Test:
     inputs: list[str]
     active_channels: list[ActiveChannel]
     steps: list[Step]
-
+    notes: str
+    
     def __post_init__(self):
         step_list = []
         active_channels_list = []

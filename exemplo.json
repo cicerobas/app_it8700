@@ -4,18 +4,18 @@
     "customer": "CEBRA",
     "input_type": "CC",
     "inputs": [
-        "100",
-        "110",
-        "253"
+        "12",
+        "24",
+        "32"
     ],
     "active_channels": [
         {
             "id": 3,
-            "helper_label": "VD +24"
+            "helper_label": "+24"
         },
         {
             "id": 4,
-            "helper_label": "VC +24"
+            "helper_label": "+24"
         }
     ],
     "steps": [
@@ -41,7 +41,7 @@
         },
         {
             "type": 1,
-            "description": "Ajuste / Carga Média",
+            "description": "Ajuste / Carga M\u00e9dia",
             "duration": 0.0,
             "input_source": 1,
             "channels_setup": [
@@ -99,5 +99,6 @@
                 }
             ]
         }
-    ]
+    ],
+    "notes": "Fazer curto no D15"
 }

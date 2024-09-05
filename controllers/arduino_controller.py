@@ -27,13 +27,14 @@ class ArduinoController:
             "9": False,
         }
         self.input_pins = ["3"]
+        self.active_input_source = 0
 
     def check_connection(self) -> bool:
         """
         Checks the connection status with the Arduino.
         Returns the connection status(bool).
         """
-        return True if self.arduino is not None else False            
+        return True if self.arduino is not None else False
 
     def set_acctive_pin(self, reset: bool) -> None:
         """
@@ -50,6 +51,28 @@ class ArduinoController:
                 else:
                     self.arduino.digital_write(pin, 1)
             sleep(0.2)
+
+    def set_input_source(self, input_source: int, input_type: str) -> None:
+        """
+        - Pino 4: CA1
+        - Pino 5: CA2
+        - Pino 6: CA3
+        - Pino 7: CC1
+        - Pino 8: CC2
+        - Pino 9: CC3
+        - Pino 10: Buzzer
+        """
+        if self.active_input_source == input_source:
+            return
+
+        match input_source:
+            case 1:
+                self.change_output("4" if input_type == "CA" else "7")
+            case 2:
+                self.change_output("5" if input_type == "CA" else "8")
+            case 3:
+                self.change_output("6" if input_type == "CA" else "9")
+        self.active_input_source = input_source
 
     def change_output(self, active_pin: str) -> None:
         """

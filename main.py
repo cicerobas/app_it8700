@@ -1,7 +1,6 @@
 import sys
 import os
 import json
-import tempfile
 from time import sleep
 
 from PySide6.QtCore import QSize, Qt, QThreadPool, Slot, Signal, QObject
@@ -27,6 +26,7 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QSizePolicy,
     QLineEdit,
+    QFrame,
 )
 
 from controllers.sat_controller import ElectronicLoadController
@@ -36,6 +36,7 @@ from widgets.channel_monitor import ChannelMonitor
 from widgets.steps_table import StepsTable
 from widgets.data_input_dialog import DataInputDialog
 from widgets.test_result_view import TestResultView
+from widgets.test_setup_view import TestSetupView
 from utils.delay_manager import DelayManager
 from utils.monitor_worker import MonitorWorker
 from utils.enums import *
@@ -51,7 +52,6 @@ class CurrentTestSetup:
     serial_number_changed: bool = False
     is_single_step: bool = False
     selected_step_index: int = -1
-    active_input_source: int = 0
     current_index: int = 0
     test_result_data = dict()
     test_sequence_status: list[bool] = []
@@ -79,6 +79,7 @@ class MainWindow(QMainWindow):
         self.delay_manager = DelayManager()
         self.steps_table = StepsTable()
         self.test_result_view = TestResultView()
+        self.test_setup_view = TestSetupView(self.arduino_controller)
         self.monitoring_worker = None
         self.temp_file = None
         self.temp_file_name = ""
@@ -112,19 +113,27 @@ class MainWindow(QMainWindow):
         self.test_result_action = QAction(
             QIcon("assets/icons/description.png"), "Resultado", self
         )
+        self.test_setup_action = QAction(
+            QIcon("assets/icons/settings.png"), "Configuração", self
+        )
+        self.test_setup_action.setEnabled(False)
 
         self.open_file_action.setShortcut(Qt.Key.Key_F3)
         self.test_result_action.setShortcut(Qt.Key.Key_F8)
+        self.test_setup_action.setShortcut(Qt.Key.Key_F4)
 
         self.open_file_action.triggered.connect(self.open_test_file)
         self.test_result_action.triggered.connect(self.handle_test_result_view)
+        self.test_setup_action.triggered.connect(self.handle_test_setup_view)
 
         # Menu
         menu = self.menuBar()
         file_menu = menu.addMenu("&Arquivo")
         file_menu.addAction(self.open_file_action)
+
         test_menu = menu.addMenu("&Teste")
         test_menu.addAction(self.test_result_action)
+        test_menu.addAction(self.test_setup_action)
 
         # Logo
         logo = QLabel()
@@ -160,7 +169,9 @@ class MainWindow(QMainWindow):
 
         # Test Details Layout
         g_info_panel_layout = QGridLayout()
-        g_info_panel_layout.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        g_info_panel_layout.setAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+        )
         g_info_panel_layout.setColumnMinimumWidth(2, 50)
         g_info_panel_layout.addWidget(group_label, 0, 0)
         g_info_panel_layout.addWidget(self.group_value_field, 0, 1)
@@ -184,6 +195,11 @@ class MainWindow(QMainWindow):
         self.v_channels_display_layout = QVBoxLayout()
         v_main_container_layout = QVBoxLayout()
 
+        divider = QFrame()
+        divider.setFrameShape(QFrame.Shape.HLine)
+        divider.setFrameShadow(QFrame.Shadow.Sunken)
+        divider.setStyleSheet("background-color: black;")
+
         self.v_channels_display_layout.setAlignment(
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop
         )
@@ -193,7 +209,9 @@ class MainWindow(QMainWindow):
         h_content_layout.addLayout(self.v_channels_display_layout)
 
         v_main_container_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        v_main_container_layout.setSpacing(15)
         v_main_container_layout.addLayout(h_header_layout)
+        v_main_container_layout.addWidget(divider)
         v_main_container_layout.addLayout(h_content_layout)
 
         main_container_widget.setLayout(v_main_container_layout)
@@ -285,7 +303,9 @@ class MainWindow(QMainWindow):
                 self.steps_table.set_selected_step(self.test_setup.current_index)
 
             self.set_fixed_step_values(step)
-            self.set_input_source(step.input_source)
+            self.arduino_controller.set_input_source(
+                step.input_source, self.test_setup.active_test.input_type
+            )
             match step.type:
                 case 1:
                     self.set_channels_load(step)
@@ -326,35 +346,6 @@ class MainWindow(QMainWindow):
                 monitor.update_fixed_values(
                     [channel.maxVolt, channel.minVolt, channel.load]
                 )
-
-    def set_input_source(self, input_source: int) -> None:
-        """
-        - Pino 4: CA1
-        - Pino 5: CA2
-        - Pino 6: CA3
-        - Pino 7: CC1
-        - Pino 8: CC2
-        - Pino 9: CC3
-        - Pino 10: Buzzer
-        """
-        if self.test_setup.active_input_source == input_source:
-            return
-
-        input_type = self.test_setup.active_test.input_type
-        match input_source:
-            case 1:
-                self.arduino_controller.change_output(
-                    "4" if input_type == "CA" else "7"
-                )
-            case 2:
-                self.arduino_controller.change_output(
-                    "5" if input_type == "CA" else "8"
-                )
-            case 3:
-                self.arduino_controller.change_output(
-                    "6" if input_type == "CA" else "9"
-                )
-        self.test_setup.active_input_source = input_source
 
     def set_channels_load(self, step: Step):
         for channel in step.channels_setup:
@@ -425,7 +416,7 @@ class MainWindow(QMainWindow):
         self.test_setup.serial_number_changed = False
         self.test_setup.is_single_step = False
         self.test_setup.selected_step_index = -1
-        self.test_setup.active_input_source = 0
+        self.arduino_controller.active_input_source = 0
         self.test_setup.current_index = 0
         self.steps_table.clearSelection()
 
@@ -502,10 +493,12 @@ class MainWindow(QMainWindow):
 
         if file_path:
             self.reset_current_test()
+            self.test_setup_view.file_path = file_path
             try:
                 with open(file_path, "r") as loaded_file:
                     test_data = json.load(loaded_file)
                 self.test_setup.active_test = Test(**test_data)
+                self.test_setup_action.setEnabled(True)
             except (json.JSONDecodeError, TypeError, ValueError) as e:
                 show_custom_dialog(
                     self,
@@ -554,6 +547,9 @@ class MainWindow(QMainWindow):
 
     def handle_test_result_view(self):
         self.test_result_view.show()
+
+    def handle_test_setup_view(self):
+        self.test_setup_view.show()
 
     def keyPressEvent(self, event: QKeyEvent):
         if self.state is TestState.WAITKEY and event.key() in [
