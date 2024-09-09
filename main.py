@@ -1,6 +1,6 @@
 import sys
 import os
-import json
+import yaml
 from time import sleep
 
 from PySide6.QtCore import QSize, Qt, QThreadPool, Slot, Signal, QObject
@@ -44,7 +44,7 @@ from utils.report_file import *
 
 
 class CurrentTestSetup:
-    active_test: Test = None
+    active_test: TestData = None
     directory_path: str = ""
     serial_number: str = None
     operator_name: str = ""
@@ -306,11 +306,10 @@ class MainWindow(QMainWindow):
             self.arduino_controller.set_input_source(
                 step.input_source, self.test_setup.active_test.input_type
             )
-            match step.type:
+            match step.step_type:
                 case 1:
                     self.set_channels_load(step)
-
-            self.handle_step_delay(step)
+                    self.handle_step_delay(step)
         else:
             if self.temp_file:
                 self.temp_file.close()
@@ -339,18 +338,17 @@ class MainWindow(QMainWindow):
             self.reset_setup()
 
     def set_fixed_step_values(self, step: Step):
-        channel_dict = {channel.id: channel for channel in step.channels_setup}
         for monitor in self.test_setup.channels:
-            if monitor.channel_id in channel_dict:
-                channel = channel_dict[monitor.channel_id]
+            if monitor.channel_id in step.channels_configuration:
+                params = step.channels_configuration[monitor.channel_id]
                 monitor.update_fixed_values(
-                    [channel.maxVolt, channel.minVolt, channel.load]
+                    [params.voltage_upper, params.voltage_lower, params.static_load]
                 )
 
     def set_channels_load(self, step: Step):
-        for channel in step.channels_setup:
-            self.sat_controller.set_channel_current(channel.id, channel.load)
-
+        for id in step.channels_configuration.keys():
+            self.sat_controller.set_channel_current(id, step.channels_configuration[id].static_load)
+        
     def handle_step_delay(self, step: Step) -> None:
         if step.duration == 0:
             self.state = TestState.WAITKEY
@@ -488,7 +486,7 @@ class MainWindow(QMainWindow):
 
     def open_test_file(self):
         file_path, _ = QFileDialog.getOpenFileName(
-            self, "Abrir arquivo de teste...", "", "Arquivos JSON (*.json)"
+            self, "Abrir arquivo de teste...", "", "Arquivos YAML (*.yaml)"
         )
 
         if file_path:
@@ -496,15 +494,9 @@ class MainWindow(QMainWindow):
             self.test_setup_view.file_path = file_path
             try:
                 with open(file_path, "r") as loaded_file:
-                    test_data = json.load(loaded_file)
-                self.test_setup.active_test = Test(**test_data)
+                    test_data = yaml.safe_load(loaded_file.read())
+                self.test_setup.active_test = TestData(**test_data)
                 self.test_setup_action.setEnabled(True)
-            except (json.JSONDecodeError, TypeError, ValueError) as e:
-                show_custom_dialog(
-                    self,
-                    f"Falha ao abrir arquivo\n{file_path}\nErro: {str(e)}",
-                    QMessageBox.Icon.Critical,
-                )
             except Exception as e:
                 show_custom_dialog(
                     self,

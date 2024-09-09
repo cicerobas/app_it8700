@@ -1,4 +1,4 @@
-import json
+import yaml
 from PySide6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
@@ -88,8 +88,8 @@ class TestSetupView(QWidget):
 
     def load_file(self):
         with open(self.file_path, "r") as file:
-            self.data = json.load(file)
-
+            self.data = yaml.safe_load(file.read())
+        
         self.set_input_radio_buttons()
         self.set_channel_labels()
         self.set_notes_text()
@@ -99,9 +99,9 @@ class TestSetupView(QWidget):
         self.header_info_label.setText(f"Grupo: {self.data["group"]} | Modelo: {self.data["model"]} | Cliente: {self.data["customer"]}")
 
     def set_input_radio_buttons(self) -> None:
-        self.input_1.setText(f' {self.data["inputs"][0]}V {self.data["input_type"]}')
-        self.input_2.setText(f' {self.data["inputs"][1]}V {self.data["input_type"]}')
-        self.input_3.setText(f' {self.data["inputs"][2]}V {self.data["input_type"]}')
+        self.input_1.setText(f' {self.data["input_sources"][0]}V {self.data["input_type"]}')
+        self.input_2.setText(f' {self.data["input_sources"][1]}V {self.data["input_type"]}')
+        self.input_3.setText(f' {self.data["input_sources"][2]}V {self.data["input_type"]}')
 
     def set_channel_labels(self):
         while self.h_channels_layout.count():
@@ -110,7 +110,7 @@ class TestSetupView(QWidget):
 
         for channel in self.data["active_channels"]:
             self.h_channels_layout.addWidget(
-                self.custom_channel_label(channel["id"], channel["helper_label"])
+                self.custom_channel_label(channel["id"], channel["label"])
             )
 
     def set_notes_text(self):
@@ -133,7 +133,7 @@ class TestSetupView(QWidget):
         self.save_button.setEnabled(False)
 
         with open(self.file_path, "w") as file:
-            json.dump(self.data, file, indent=4)
+            yaml.dump(self.data, file, default_flow_style=False, sort_keys=False)
 
     def custom_group_box(self, box_title: str, fixed_heigth: int) -> QGroupBox:
         custom_gb = QGroupBox(title=box_title)

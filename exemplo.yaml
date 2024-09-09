@@ -1,0 +1,59 @@
+group: G01234
+model: SCCAASS
+customer: Cebra
+input_type: CC
+input_sources:
+- 17
+- 32
+- 0
+active_channels:
+- id: 1
+  label: VB +24V
+load_parameters:
+- id: 1
+  tag: CMin
+  voltage_upper: 5.25
+  voltage_lower: 4.95
+  static_load: 0.0
+- id: 2
+  tag: CMax
+  voltage_upper: 5.25
+  voltage_lower: 4.75
+  static_load: 0.95
+steps:
+- step_type: 1
+  description: Carga Minima 32Vcc
+  duration: 3.0
+  input_source: 2
+  channels_configuration:
+  - channel_id: 1
+    parameters_id: 1
+- step_type: 1
+  description: "Carga M\xE1xima 32Vcc"
+  duration: 2.0
+  input_source: 2
+  channels_configuration:
+  - channel_id: 1
+    parameters_id: 2
+- step_type: 1
+  description: Curto
+  duration: 0.0
+  input_source: 1
+  channels_configuration:
+  - channel_id: 1
+    parameters_id: 1
+- step_type: 1
+  description: Carga Minima 17Vcc
+  duration: 3.0
+  input_source: 1
+  channels_configuration:
+  - channel_id: 1
+    parameters_id: 1
+- step_type: 1
+  description: "Carga M\xE1xima 17Vcc"
+  duration: 2.0
+  input_source: 1
+  channels_configuration:
+  - channel_id: 1
+    parameters_id: 2
+notes: exemplo asdf
