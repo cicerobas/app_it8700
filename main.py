@@ -308,7 +308,7 @@ class MainWindow(QMainWindow):
             )
             match step.step_type:
                 case 1:
-                    self.set_channels_load(step)
+                    self.update_load_display(step)
                     self.handle_step_delay(step)
         else:
             if self.temp_file:
@@ -341,14 +341,15 @@ class MainWindow(QMainWindow):
         for monitor in self.test_setup.channels:
             if monitor.channel_id in step.channels_configuration:
                 params = step.channels_configuration[monitor.channel_id]
-                monitor.update_fixed_values(
-                    [params.voltage_upper, params.voltage_lower, params.static_load]
+                monitor.update_step_values(
+                    [
+                        params.voltage_upper,
+                        params.voltage_lower,
+                        params.load_upper,
+                        params.load_lower,
+                    ]
                 )
 
-    def set_channels_load(self, step: Step):
-        for id in step.channels_configuration.keys():
-            self.sat_controller.set_channel_current(id, step.channels_configuration[id].static_load)
-        
     def handle_step_delay(self, step: Step) -> None:
         if step.duration == 0:
             self.state = TestState.WAITKEY
@@ -366,19 +367,19 @@ class MainWindow(QMainWindow):
         step_pass = True
         current_step_data = []
 
-        for channel in self.test_setup.channels:
-            channel_data = {
-                "channel_id": str(channel.channel_id),
-                "output": channel.data.output,
-                "vmax": channel.data.vmax,
-                "vmin": channel.data.vmin,
-                "load": channel.data.load,
-                "power": channel.data.power,
-            }
+        # for channel in self.test_setup.channels:
+        #     channel_data = {
+        #         "channel_id": str(channel.channel_id),
+        #         "output": channel.data.output,
+        #         "vmax": channel.data.vmax,
+        #         "vmin": channel.data.vmin,
+        #         "load": channel.data.load,
+        #         "power": channel.data.power,
+        #     }
 
-            current_step_data.append(channel_data)
-            if not (channel.data.vmin <= channel.data.output <= channel.data.vmax):
-                step_pass = False
+        #     current_step_data.append(channel_data)
+        #     if not (channel.data.vmin <= channel.data.output <= channel.data.vmax):
+        #         step_pass = False
 
         self.steps_table.set_step_status(step_pass)
         self.test_setup.test_sequence_status.append(step_pass)
@@ -436,8 +437,15 @@ class MainWindow(QMainWindow):
     @Slot()
     def update_output_display(self):
         for channel in self.test_setup.channels:
-            channel.update_output_value(
+            channel.update_voltage_value(
                 self.sat_controller.get_channel_value(channel.channel_id)
+            )
+
+    def update_load_display(self, step: Step):
+        for channel in self.test_setup.channels:
+            channel.update_load_value(
+                step.channels_configuration[channel.channel_id].static_load,
+                step.step_type,
             )
 
     def serial_number_changed(self):
@@ -470,7 +478,7 @@ class MainWindow(QMainWindow):
         self.steps_table.update_step_list(self.test_setup.active_test.steps)
 
         for channel in self.test_setup.active_test.active_channels:
-            channel_monitor = ChannelMonitor(channel.id)
+            channel_monitor = ChannelMonitor(channel.id, channel.label)
             self.test_setup.channels.append(channel_monitor)
             self.v_channels_display_layout.addWidget(channel_monitor)
 

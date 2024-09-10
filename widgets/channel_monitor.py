@@ -1,118 +1,106 @@
-from PySide6.QtCore import QSize, Qt
-from PySide6.QtWidgets import QGroupBox, QHBoxLayout, QVBoxLayout, QGridLayout, QLabel
+from PySide6.QtWidgets import (
+    QLabel,
+    QVBoxLayout,
+    QHBoxLayout,
+    QFrame,
+    QSizePolicy,
+    QGroupBox,
+)
+from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QFont
 
 
 class Data:
-    output: float = 0
-    vmax: float = 0
-    vmin: float = 0
+    voltage_output: float = 0
+    voltage_upper: float = 0
+    voltage_lower: float = 0
     load: float = 0
+    load_upper: float = 0
+    load_lower: float = 0
     power: float = 0
 
 
 class ChannelMonitor(QGroupBox):
-    def __init__(self, channel: int):
+    def __init__(self, channel_id:int, channel_label:str):
         super().__init__()
-        self.channel_id = channel
+        self.channel_id = channel_id
+        self.channel_label = channel_label
         self.data = Data()
+        self.setFixedSize(QSize(500, 160))
+        self.setStyleSheet("QGroupBox { border: 2px solid gray; border-radius: 5px; }")
 
-        self.setTitle(f"Canal {self.channel_id}")
-        self.setFixedSize(QSize(500, 150))
-        self.setStyleSheet(
-            "QGroupBox { border: 2px solid gray; border-radius: 5px; padding: 10px; }"
-            "QGroupBox:title { subcontrol-position: top center; padding: 0 10px; }"
+        self.channel_id_label = custom_label(f"Canal {self.channel_id}", 14, 500)
+        self.channel_description_label = custom_label(self.channel_label, 14, 500)
+        self.voltage_value_label = custom_label("0.00 V", 36, 700)
+        self.load_value_label = custom_label("0.00 A", 36, 700)
+        self.step_info_label = custom_label(
+            "V (0.00 ~ 0.00)  |  A (0.00 ~ 0.00)  |  Potência: 0.00W", 12, 400
         )
 
-        # Layouts
-        h_container_layout = QHBoxLayout()
-        v_output_field_layout = QVBoxLayout()
-        g_fixed_values_layout = QGridLayout()
+        h_header_layout = QHBoxLayout()
+        h_header_layout.addWidget(self.channel_id_label, 0, Qt.AlignmentFlag.AlignLeft)
+        h_header_layout.addWidget(
+            self.channel_description_label, 0, Qt.AlignmentFlag.AlignRight
+        )
+        separator = QFrame()
+        separator.setFrameShape(QFrame.VLine)
+        separator.setFrameShadow(QFrame.Raised)
 
-        self.setLayout(h_container_layout)
+        h_values_layout = QHBoxLayout()
+        h_values_layout.addWidget(
+            self.voltage_value_label, 0, Qt.AlignmentFlag.AlignLeft
+        )
+        h_values_layout.addWidget(separator)
+        h_values_layout.addWidget(self.load_value_label, 0, Qt.AlignmentFlag.AlignRight)
+        values_frame = QFrame()
+        values_frame.setFrameShape(QFrame.StyledPanel)
+        values_frame.setFrameShadow(QFrame.Raised)
+        values_frame.setLayout(h_values_layout)
+        values_frame.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Expanding)
 
-        # Labels
-        self.output_label = QLabel("Saída:")
-        self.output_label.setFont(QFont("Arial", 12, QFont.Weight.Bold))
-        self.output_label.setAlignment(Qt.AlignmentFlag.AlignTop)
+        v_main_layout = QVBoxLayout()
+        v_main_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        v_main_layout.addLayout(h_header_layout)
+        v_main_layout.addWidget(values_frame)
+        v_main_layout.addWidget(self.step_info_label, 0, Qt.AlignmentFlag.AlignJustify)
 
-        vmax_label = defaut_field_name_label("V Max")
-        vmin_label = defaut_field_name_label("V Min")
-        load_label = defaut_field_name_label("Carga")
-        power_label = defaut_field_name_label("Potência")
+        self.setLayout(v_main_layout)
+    
+    def update_step_values(self, values: list[str]) -> None:
+        # values = ['VoltageUpper', 'VoltageLower', 'LoadUpper', 'LoadLower']
+        self.data.voltage_upper = float(values[0])if values[0] else 0.0
+        self.data.voltage_lower = float(values[1])if values[1] else 0.0
+        self.data.load_upper = float(values[2]) if values[2] else 0.0
+        self.data.load_lower = float(values[3]) if values[3] else 0.0
+        self.set_info_label_values()
 
-        # Value Fields
-        self.output_value = QLabel("00.00 V")
-        self.output_value.setFont(QFont("Arial", 24, QFont.Weight.Bold))
-        self.output_value.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.output_value.setStyleSheet("border: 1px solid gray; padding: 5px;")
-        self.output_value.setScaledContents(True)
-        self.output_value.setFixedHeight(80)
+    def set_info_label_values(self):
+        self.step_info_label.setText(f"V ({self.data.voltage_upper} ~ {self.data.voltage_lower})  |  A ({self.data.load_upper} ~ {self.data.load_lower})  |  Potência: {"%.2f" % self.data.power}W")
 
-        self.vmax_value = defaut_field_value_label()
-        self.vmin_value = defaut_field_value_label()
-        self.load_value = defaut_field_value_label()
-        self.power_value = defaut_field_value_label()
+    def update_load_value(self, value, step_type):
+        self.data.load = float(value)
+        self.load_value_label.setText(f'{self.data.load} A')
+        self.load_value_label.setStyleSheet(f"color:{self.check_value_limit(self.data.load, self.data.load_upper, self.data.load_lower)};" if step_type == 2 else "color: black;")
 
-        # Layouts Setup
-        v_output_field_layout.addWidget(self.output_label)
-        v_output_field_layout.addWidget(self.output_value)
-
-        g_fixed_values_layout.addWidget(vmax_label, 0, 0, Qt.AlignmentFlag.AlignRight)
-        g_fixed_values_layout.addWidget(self.vmax_value, 0, 1)
-        g_fixed_values_layout.addWidget(vmin_label, 1, 0, Qt.AlignmentFlag.AlignRight)
-        g_fixed_values_layout.addWidget(self.vmin_value, 1, 1)
-        g_fixed_values_layout.addWidget(load_label, 2, 0, Qt.AlignmentFlag.AlignRight)
-        g_fixed_values_layout.addWidget(self.load_value, 2, 1)
-        g_fixed_values_layout.addWidget(power_label, 3, 0, Qt.AlignmentFlag.AlignRight)
-        g_fixed_values_layout.addWidget(self.power_value, 3, 1)
-
-        h_container_layout.addLayout(v_output_field_layout)
-        h_container_layout.addLayout(g_fixed_values_layout)
-
-    def update_fixed_values(self, values: list[str]) -> None:
-        # values = ['Vmax', 'Vmin', 'Load']
-        self.data.vmax = float(values[0])
-        self.data.vmin = float(values[1])
-        self.data.load = float(values[2])
-        self.set_fixed_value_fields()
-
-    def set_fixed_value_fields(self):
-        self.vmax_value.setText(f"{self.data.vmax} V")
-        self.vmin_value.setText(f"{self.data.vmin} V")
-        self.load_value.setText(f"{self.data.load} A")
-
-    def update_output_value(self, value: str):
-        self.data.output = float(value)
-        background_color = "#81C784"
-        self.output_value.setText(f'{"%.2f" % self.data.output} V')
-        if self.data.output > self.data.vmax:
-            background_color = "#E57373"
-        elif self.data.output < self.data.vmin:
-            background_color = "#FFF176"
-
-        self.output_value.setStyleSheet(f"background-color:{background_color};")
+    def update_voltage_value(self, value):
+        self.data.voltage_output = float(value)
+        self.voltage_value_label.setText(f'{"%.2f" % self.data.voltage_output} V')
+        self.voltage_value_label.setStyleSheet(f"color:{self.check_value_limit(self.data.voltage_output, self.data.voltage_upper, self.data.voltage_lower)};")
         self.update_power_value()
 
+    def check_value_limit(self, value, upper, lower) -> str:
+        color = "black"
+        if value > upper:
+            color = "#E57373"
+        elif value < lower:
+            color = "#FFF176"
+        return color
+    
     def update_power_value(self):
-        self.data.power = self.data.load * self.data.output
-        if self.data.power > 100:
-            fmt_value = str(int(self.data.power))
+        self.data.power = self.data.load * self.data.voltage_output
+        self.set_info_label_values()
 
-        fmt_value = "%.2f" % self.data.power
-        self.power_value.setText(f"{fmt_value} W")
-
-
-def defaut_field_name_label(text: str) -> QLabel:
+def custom_label(text: str, font_size: int, weight: int) -> QLabel:
     label = QLabel(text)
-    label.setFont(QFont("Arial", 12))
-    return label
-
-
-def defaut_field_value_label() -> QLabel:
-    label = QLabel("0.0")
-    label.setFont(QFont("Arial", 12))
-    label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    label.setFixedHeight(25)
-    label.setStyleSheet("border: 1px solid gray; padding: 5px;")
+    label.setFont(QFont("Arial", font_size, weight))
     return label
