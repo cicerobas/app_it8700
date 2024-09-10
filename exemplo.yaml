@@ -20,40 +20,43 @@ load_parameters:
   voltage_upper: 5.25
   voltage_lower: 4.75
   static_load: 0.95
+- id: 3
+  tag: "SobreC"
+  static_load: 0.95
+  end_load: 1.65
+  increase_step: 0.01
+  increase_delay: 0.5
+  load_upper: 1.35
+  load_lower: 0.8
+  voltage_under_limit: 4.8
+
 steps:
 - step_type: 1
-  description: Carga Minima 32Vcc
-  duration: 3.0
-  input_source: 2
-  channels_configuration:
-  - channel_id: 1
-    parameters_id: 1
-- step_type: 1
-  description: "Carga M\xE1xima 32Vcc"
-  duration: 2.0
-  input_source: 2
-  channels_configuration:
-  - channel_id: 1
-    parameters_id: 2
-- step_type: 1
-  description: Curto
-  duration: 0.0
-  input_source: 1
-  channels_configuration:
-  - channel_id: 1
-    parameters_id: 1
-- step_type: 1
   description: Carga Minima 17Vcc
-  duration: 3.0
+  duration: 5.0
   input_source: 1
   channels_configuration:
   - channel_id: 1
     parameters_id: 1
 - step_type: 1
   description: "Carga M\xE1xima 17Vcc"
-  duration: 2.0
+  duration: 3.0
   input_source: 1
   channels_configuration:
   - channel_id: 1
     parameters_id: 2
+- step_type: 2
+  description: Sobrecorrente
+  duration: 0.0
+  input_source: 1
+  channels_configuration:
+  - channel_id: 1
+    parameters_id: 3
+- step_type: 1
+  description: Curto Amperimetro
+  duration: 0.0
+  input_source: 1
+  channels_configuration:
+  - channel_id: 1
+    parameters_id: 1
 notes: exemplo asdf

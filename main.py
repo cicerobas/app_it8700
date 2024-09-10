@@ -3,7 +3,7 @@ import os
 import yaml
 from time import sleep
 
-from PySide6.QtCore import QSize, Qt, QThreadPool, Slot, Signal, QObject
+from PySide6.QtCore import QSize, Qt, QTimer, QThreadPool, Slot, Signal, QObject
 from PySide6.QtGui import (
     QAction,
     QIcon,
@@ -220,14 +220,14 @@ class MainWindow(QMainWindow):
     def start_test_sequence(self):
         if self.state in [TestState.RUNNING, TestState.PAUSED, TestState.WAITKEY]:
             return
-        if not self.sat_controller.conn_status:
-            show_custom_dialog(
-                self, "SAT IT8700 - Sem Conexão", QMessageBox.Icon.Critical
-            )
-            return
-        if not self.arduino_controller.check_connection():
-            show_custom_dialog(self, "Arduino - Sem Conexão", QMessageBox.Icon.Critical)
-            return
+        # if not self.sat_controller.conn_status:
+        #     show_custom_dialog(
+        #         self, "SAT IT8700 - Sem Conexão", QMessageBox.Icon.Critical
+        #     )
+        #     return
+        # if not self.arduino_controller.check_connection():
+        #     show_custom_dialog(self, "Arduino - Sem Conexão", QMessageBox.Icon.Critical)
+        #     return
         if self.test_setup.active_test is None:
             show_custom_dialog(
                 self, "Carregue um Arquivo de Teste", QMessageBox.Icon.Information
@@ -288,7 +288,7 @@ class MainWindow(QMainWindow):
         self.reset_setup()
 
     def run_steps(self):
-        steps: list = []
+        steps: list[Step] = []
         if self.test_setup.is_single_step:
             steps = [
                 self.test_setup.active_test.steps[self.test_setup.selected_step_index]
@@ -302,14 +302,16 @@ class MainWindow(QMainWindow):
             if not self.test_setup.is_single_step:
                 self.steps_table.set_selected_step(self.test_setup.current_index)
 
-            self.set_fixed_step_values(step)
             self.arduino_controller.set_input_source(
                 step.input_source, self.test_setup.active_test.input_type
             )
+
+            self.set_fixed_step_values(step)
             match step.step_type:
                 case 1:
-                    self.update_load_display(step)
-                    self.handle_step_delay(step)
+                    self.cc_test_mode(step)
+                case 2:
+                    self.cl_test_mode(step)
         else:
             if self.temp_file:
                 self.temp_file.close()
@@ -321,21 +323,69 @@ class MainWindow(QMainWindow):
                     if False not in self.test_setup.test_sequence_status
                     else TestState.FAILED
                 )
+            print(self.test_setup.test_result_data)
+            # self.temp_file = generate_report_file(self.test_setup.test_result_data)
+            # self.temp_file_name = self.temp_file.name
+            # self.test_result_view.text = self.read_temp_file()
 
-            self.temp_file = generate_report_file(self.test_setup.test_result_data)
-            self.temp_file_name = self.temp_file.name
-            self.test_result_view.text = self.read_temp_file()
-
-            if self.state is TestState.PASSED and not self.test_setup.is_single_step:
-                with open(
-                    file=f"{self.test_setup.directory_path}{self.test_setup.serial_number}.txt",
-                    mode="w",
-                    encoding="utf-8",
-                ) as test_file:
-                    test_file.write(self.read_temp_file())
+            # if self.state is TestState.PASSED and not self.test_setup.is_single_step:
+            #     with open(
+            #         file=f"{self.test_setup.directory_path}{self.test_setup.serial_number}.txt",
+            #         mode="w",
+            #         encoding="utf-8",
+            #     ) as test_file:
+            #         test_file.write(self.read_temp_file())
 
             self.update_status_label()
             self.reset_setup()
+
+    def cc_test_mode(self, step: Step):
+        for id, params in step.channels_configuration.items():
+            self.update_current_load(id, params.static_load)
+        if step.duration == 0:
+            self.state = TestState.WAITKEY
+            self.update_status_label(step.description)
+        else:
+            self.delay_manager.start_delay(step.duration * 1000)
+
+    def cl_test_mode(self, step: Step):
+        self.cl_step_done = False
+        self.cl_channel_id = self.test_setup.get_active_channel_ids()[0]
+        self.cl_step_params = step.channels_configuration.get(self.cl_channel_id)
+        self.current_load = self.cl_step_params.static_load
+        self.update_current_load(self.cl_channel_id, self.cl_step_params.static_load)
+        self.handle_increase_steps()
+
+    def handle_increase_steps(self):
+        channel = [
+            channel
+            for channel in self.test_setup.channels
+            if channel.channel_id == self.cl_channel_id
+        ][0]
+        if not self.cl_step_done:
+            if (
+                channel.data.voltage_output >= self.cl_step_params.voltage_under_limit
+                and self.current_load <= self.cl_step_params.end_load
+            ):
+                self.current_load += self.cl_step_params.increase_step
+                self.update_current_load(self.cl_channel_id, self.current_load)
+                QTimer.singleShot(
+                    self.cl_step_params.increase_delay * 1000,
+                    self.handle_increase_steps,
+                )
+            else:
+                self.update_current_load(
+                    self.cl_channel_id, self.cl_step_params.static_load
+                )
+                self.cl_step_done = True
+                QTimer.singleShot(100, self.handle_increase_steps)
+        else:
+            if channel.data.voltage_output <= self.cl_step_params.voltage_under_limit:
+                QTimer.singleShot(100, self.handle_increase_steps)
+            else:
+                self.validate_cl_step_values()
+                self.test_setup.current_index += 1
+                self.run_steps()
 
     def set_fixed_step_values(self, step: Step):
         for monitor in self.test_setup.channels:
@@ -350,36 +400,55 @@ class MainWindow(QMainWindow):
                     ]
                 )
 
-    def handle_step_delay(self, step: Step) -> None:
-        if step.duration == 0:
-            self.state = TestState.WAITKEY
-            self.update_status_label(step.description)
-        else:
-            self.delay_manager.start_delay(step.duration * 1000)
-
     def on_delay_completed(self):
         if self.state is not TestState.CANCELED:
-            self.validate_step_values()
+            self.validate_cc_step_values()
             self.test_setup.current_index += 1
             self.run_steps()
 
-    def validate_step_values(self) -> None:
+    def validate_cc_step_values(self) -> None:
         step_pass = True
         current_step_data = []
 
-        # for channel in self.test_setup.channels:
-        #     channel_data = {
-        #         "channel_id": str(channel.channel_id),
-        #         "output": channel.data.output,
-        #         "vmax": channel.data.vmax,
-        #         "vmin": channel.data.vmin,
-        #         "load": channel.data.load,
-        #         "power": channel.data.power,
-        #     }
+        for channel in self.test_setup.channels:
+            channel_data = {
+                "channel_id": str(channel.channel_id),
+                "voltage_output": channel.data.voltage_output,
+                "voltage_upper": channel.data.voltage_upper,
+                "voltage_lower": channel.data.voltage_lower,
+                "load": channel.data.load,
+                "power": channel.data.power,
+            }
 
-        #     current_step_data.append(channel_data)
-        #     if not (channel.data.vmin <= channel.data.output <= channel.data.vmax):
-        #         step_pass = False
+            current_step_data.append(channel_data)
+            if not (
+                channel.data.voltage_lower
+                <= channel.data.voltage_output
+                <= channel.data.voltage_upper
+            ):
+                step_pass = False
+
+        self.steps_table.set_step_status(step_pass)
+        self.test_setup.test_sequence_status.append(step_pass)
+        self.handle_test_data(tuple(current_step_data), step_pass)
+
+    def validate_cl_step_values(self) -> None:
+        step_pass = True
+        current_step_data = []
+
+        for channel in self.test_setup.channels:
+            channel_data = {
+                "channel_id": str(channel.channel_id),
+                "load_upper": channel.data.load_upper,
+                "load_lower": channel.data.load_lower,
+                "load": self.current_load,
+            }
+
+            current_step_data.append(channel_data)
+            if not (
+                channel.data.load_lower <= channel.data.load <= channel.data.load_upper
+            ):
+                step_pass = False
 
         self.steps_table.set_step_status(step_pass)
         self.test_setup.test_sequence_status.append(step_pass)
@@ -390,6 +459,7 @@ class MainWindow(QMainWindow):
         step_data = {
             "description": current_step.description,
             "status": step_status,
+            "type": current_step.step_type,
             "channels": data,
         }
         self.test_setup.test_result_data["steps"].append(step_data)
@@ -441,12 +511,11 @@ class MainWindow(QMainWindow):
                 self.sat_controller.get_channel_value(channel.channel_id)
             )
 
-    def update_load_display(self, step: Step):
+    def update_current_load(self, id, load):
         for channel in self.test_setup.channels:
-            channel.update_load_value(
-                step.channels_configuration[channel.channel_id].static_load,
-                step.step_type,
-            )
+            if channel.channel_id == id:
+                channel.update_load_value(load)
+                self.sat_controller.set_channel_current(id, load)
 
     def serial_number_changed(self):
         self.test_setup.serial_number = str(

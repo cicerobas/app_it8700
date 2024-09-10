@@ -68,8 +68,8 @@ class ChannelMonitor(QGroupBox):
     
     def update_step_values(self, values: list[str]) -> None:
         # values = ['VoltageUpper', 'VoltageLower', 'LoadUpper', 'LoadLower']
-        self.data.voltage_upper = float(values[0])if values[0] else 0.0
-        self.data.voltage_lower = float(values[1])if values[1] else 0.0
+        self.data.voltage_upper = float(values[0]) if values[0] else 0.0
+        self.data.voltage_lower = float(values[1]) if values[1] else 0.0
         self.data.load_upper = float(values[2]) if values[2] else 0.0
         self.data.load_lower = float(values[3]) if values[3] else 0.0
         self.set_info_label_values()
@@ -77,24 +77,14 @@ class ChannelMonitor(QGroupBox):
     def set_info_label_values(self):
         self.step_info_label.setText(f"V ({self.data.voltage_upper} ~ {self.data.voltage_lower})  |  A ({self.data.load_upper} ~ {self.data.load_lower})  |  Potência: {"%.2f" % self.data.power}W")
 
-    def update_load_value(self, value, step_type):
+    def update_load_value(self, value):
         self.data.load = float(value)
-        self.load_value_label.setText(f'{self.data.load} A')
-        self.load_value_label.setStyleSheet(f"color:{self.check_value_limit(self.data.load, self.data.load_upper, self.data.load_lower)};" if step_type == 2 else "color: black;")
+        self.load_value_label.setText(f'{"%.2f" % self.data.load} A')
 
     def update_voltage_value(self, value):
         self.data.voltage_output = float(value)
         self.voltage_value_label.setText(f'{"%.2f" % self.data.voltage_output} V')
-        self.voltage_value_label.setStyleSheet(f"color:{self.check_value_limit(self.data.voltage_output, self.data.voltage_upper, self.data.voltage_lower)};")
         self.update_power_value()
-
-    def check_value_limit(self, value, upper, lower) -> str:
-        color = "black"
-        if value > upper:
-            color = "#E57373"
-        elif value < lower:
-            color = "#FFF176"
-        return color
     
     def update_power_value(self):
         self.data.power = self.data.load * self.data.voltage_output
