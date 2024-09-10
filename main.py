@@ -220,14 +220,14 @@ class MainWindow(QMainWindow):
     def start_test_sequence(self):
         if self.state in [TestState.RUNNING, TestState.PAUSED, TestState.WAITKEY]:
             return
-        # if not self.sat_controller.conn_status:
-        #     show_custom_dialog(
-        #         self, "SAT IT8700 - Sem Conexão", QMessageBox.Icon.Critical
-        #     )
-        #     return
-        # if not self.arduino_controller.check_connection():
-        #     show_custom_dialog(self, "Arduino - Sem Conexão", QMessageBox.Icon.Critical)
-        #     return
+        if not self.sat_controller.conn_status:
+            show_custom_dialog(
+                self, "SAT IT8700 - Sem Conexão", QMessageBox.Icon.Critical
+            )
+            return
+        if not self.arduino_controller.check_connection():
+            show_custom_dialog(self, "Arduino - Sem Conexão", QMessageBox.Icon.Critical)
+            return
         if self.test_setup.active_test is None:
             show_custom_dialog(
                 self, "Carregue um Arquivo de Teste", QMessageBox.Icon.Information
@@ -323,18 +323,17 @@ class MainWindow(QMainWindow):
                     if False not in self.test_setup.test_sequence_status
                     else TestState.FAILED
                 )
-            print(self.test_setup.test_result_data)
-            # self.temp_file = generate_report_file(self.test_setup.test_result_data)
-            # self.temp_file_name = self.temp_file.name
-            # self.test_result_view.text = self.read_temp_file()
+            self.temp_file = generate_report_file(self.test_setup.test_result_data)
+            self.temp_file_name = self.temp_file.name
+            self.test_result_view.text = self.read_temp_file()
 
-            # if self.state is TestState.PASSED and not self.test_setup.is_single_step:
-            #     with open(
-            #         file=f"{self.test_setup.directory_path}{self.test_setup.serial_number}.txt",
-            #         mode="w",
-            #         encoding="utf-8",
-            #     ) as test_file:
-            #         test_file.write(self.read_temp_file())
+            if self.state is TestState.PASSED and not self.test_setup.is_single_step:
+                with open(
+                    file=f"{self.test_setup.directory_path}{self.test_setup.serial_number}.txt",
+                    mode="w",
+                    encoding="utf-8",
+                ) as test_file:
+                    test_file.write(self.read_temp_file())
 
             self.update_status_label()
             self.reset_setup()
@@ -357,6 +356,8 @@ class MainWindow(QMainWindow):
         self.handle_increase_steps()
 
     def handle_increase_steps(self):
+        if self.state is TestState.CANCELED:
+            return
         channel = [
             channel
             for channel in self.test_setup.channels
@@ -439,6 +440,7 @@ class MainWindow(QMainWindow):
         for channel in self.test_setup.channels:
             channel_data = {
                 "channel_id": str(channel.channel_id),
+                "under_voltage": self.cl_step_params.voltage_under_limit,
                 "load_upper": channel.data.load_upper,
                 "load_lower": channel.data.load_lower,
                 "load": self.current_load,
