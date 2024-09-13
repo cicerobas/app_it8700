@@ -2,8 +2,8 @@ from datetime import datetime
 import tempfile
 
 
-def generate_report_file(data:dict):
-    temp_file = tempfile.NamedTemporaryFile(delete=False, mode='w', encoding='utf-8')
+def generate_report_file(data: dict):
+    temp_file = tempfile.NamedTemporaryFile(delete=False, mode="w", encoding="utf-8")
 
     divider = "|" + "=" * 67 + "|\n"
     group = data.get("group")
@@ -48,9 +48,15 @@ def generate_report_file(data:dict):
 
                     channels_line += f"[Channel {channel['channel_id']}]=="
                     static_load_line += f"[ {static_load+' '*(8-len(static_load))}]A "
-                    voltage_upper_line += f"[ {voltage_upper+' '*(8-len(voltage_upper))}]V "
-                    voltage_lower_line += f"[ {voltage_lower+' '*(8-len(voltage_lower))}]V "
-                    voltage_output_line += f"[ {voltage_output+' '*(8-len(voltage_output))}]V "
+                    voltage_upper_line += (
+                        f"[ {voltage_upper+' '*(8-len(voltage_upper))}]V "
+                    )
+                    voltage_lower_line += (
+                        f"[ {voltage_lower+' '*(8-len(voltage_lower))}]V "
+                    )
+                    voltage_output_line += (
+                        f"[ {voltage_output+' '*(8-len(voltage_output))}]V "
+                    )
                     power_line += f"[ {power+' '*(8-len(power))}]W "
             case 2:
                 channels_line = "|" + "=" * 15
@@ -65,30 +71,58 @@ def generate_report_file(data:dict):
                     load_limit = str(channel["load"])
 
                     channels_line += f"[Channel {channel['channel_id']}]=="
-                    under_voltage_line += f"[ {under_voltage+' '*(8-len(under_voltage))}]V "
+                    under_voltage_line += (
+                        f"[ {under_voltage+' '*(8-len(under_voltage))}]V "
+                    )
                     load_upper_line += f"[ {load_upper+' '*(8-len(load_upper))}]A "
                     load_lower_line += f"[ {load_lower+' '*(8-len(load_lower))}]A "
                     load_limit_line += f"[ {load_limit+' '*(8-len(load_limit))}]A "
-        
+            case 3:
+                channels_line = "|" + "=" * 15
+                voltage_ref_line = "|Voltage Ref. : "
+                shutdown_line = "|Shutdown: " + " " * 5
+                recovery_line = "|Recovery: " + " " * 5
+                short_load_line = "|Load: " + " " * 9
+                for channel in step["channels"]:
+                    voltage_ref = str(channel["voltage_ref"])
+                    shutdown = "PASS" if channel["shutdown"] else "FAIL"
+                    recovery = "PASS" if channel["recovery"] else "FAIL"
+                    load = str(channel["load"])
+
+                    channels_line += f"[Channel {channel['channel_id']}]=="
+                    voltage_ref_line += f"[ {voltage_ref+' '*(8-len(voltage_ref))}]V "
+                    shutdown_line += f"[ {shutdown+' '*(8-len(shutdown))}]  "
+                    recovery_line += f"[ {recovery+' '*(8-len(recovery))}]  "
+                    short_load_line += f"[ {load+' '*(8-len(load))}]A "
+
         lines.append(f"{channels_line + '=' * (68 - len(channels_line))}|\n")
         match type:
             case 1:
-                lines.append(f"{static_load_line + ' ' * (68 - len(static_load_line))}|\n")
-                lines.append(f"{voltage_upper_line + ' ' * (68 - len(voltage_upper_line))}|\n")
-                lines.append(f"{voltage_lower_line + ' ' * (68 - len(voltage_lower_line))}|\n")
-                lines.append(f"{voltage_output_line + ' ' * (68 - len(voltage_output_line))}|\n")
-                lines.append(f"{power_line + ' ' * (68 - len(power_line))}|\n")
+                lines.append(format_line(static_load_line))
+                lines.append(format_line(voltage_upper_line))
+                lines.append(format_line(voltage_lower_line))
+                lines.append(format_line(voltage_output_line))
+                lines.append(format_line(power_line))
             case 2:
-                lines.append(f"{under_voltage_line + ' ' * (68 - len(under_voltage_line))}|\n")
-                lines.append(f"{load_upper_line + ' ' * (68 - len(load_upper_line))}|\n")
-                lines.append(f"{load_lower_line + ' ' * (68 - len(load_lower_line))}|\n")
-                lines.append(f"{load_limit_line + ' ' * (68 - len(load_limit_line))}|\n")
-                
+                lines.append(format_line(under_voltage_line))
+                lines.append(format_line(load_upper_line))
+                lines.append(format_line(load_lower_line))
+                lines.append(format_line(load_limit_line))
+            case 3:
+                lines.append(format_line(voltage_ref_line))
+                lines.append(format_line(shutdown_line))
+                lines.append(format_line(recovery_line))
+                lines.append(format_line(short_load_line))
+
         temp_file.writelines(lines)
         lines.clear()
 
     temp_file.write(divider)
-    
+
     temp_file.seek(0)
     temp_file.flush()
     return temp_file
+
+
+def format_line(text: str) -> str:
+    return f"{text + ' ' * (68 - len(text))}|\n"

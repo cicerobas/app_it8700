@@ -312,6 +312,8 @@ class MainWindow(QMainWindow):
                     self.cc_test_mode(step)
                 case 2:
                     self.cl_test_mode(step)
+                case 3:
+                    self.short_test_mode(step)
         else:
             if self.temp_file:
                 self.temp_file.close()
@@ -358,11 +360,14 @@ class MainWindow(QMainWindow):
     def handle_increase_steps(self):
         if self.state is TestState.CANCELED:
             return
-        channel = [
-            channel
-            for channel in self.test_setup.channels
-            if channel.channel_id == self.cl_channel_id
-        ][0]
+        channel = next(
+            (
+                c
+                for c in self.test_setup.channels
+                if c.channel_id == self.cl_channel_id
+            ),
+            None,
+        )
         if not self.cl_step_done:
             if (
                 channel.data.voltage_output >= self.cl_step_params.voltage_under_limit
@@ -387,6 +392,59 @@ class MainWindow(QMainWindow):
                 self.validate_cl_step_values()
                 self.test_setup.current_index += 1
                 self.run_steps()
+
+    def short_test_mode(self, step: Step):
+        self.short_test_channel = self.test_setup.get_active_channel_ids()[0]
+        self.short_test_cycle = 0
+        self.short_test_params = step.channels_configuration.get(
+            self.short_test_channel
+        )
+        self.shutdown_state = False
+        self.recovery_state = False
+        self.sat_controller.toggle_short_mode(self.short_test_channel, True)
+        self.update_current_load(
+            self.short_test_channel, self.short_test_params.static_load
+        )
+        self.check_short_state()
+
+    def check_short_state(self):
+        VOLTAGE_SHUTDOWN_FACTOR = 0.2
+        SHORT_TEST_MAX_CYCLE = 30
+
+        if self.short_test_cycle >= SHORT_TEST_MAX_CYCLE:
+            self.validade_short_test(False)
+            return
+        channel = next(
+            (
+                c
+                for c in self.test_setup.channels
+                if c.channel_id == self.short_test_channel
+            ),
+            None,
+        )
+
+        voltage_output = channel.data.voltage_output
+        voltage_lower = self.short_test_params.voltage_lower
+
+        if voltage_output < voltage_lower and self.short_test_cycle == 0:
+            QTimer.singleShot(500, self.check_short_state)
+            return
+
+        if (
+            not self.shutdown_state
+            and voltage_output < voltage_lower * VOLTAGE_SHUTDOWN_FACTOR
+        ):
+            self.shutdown_state = True
+            self.sat_controller.toggle_short_mode(self.short_test_channel, False)
+
+        if self.shutdown_state and voltage_output > voltage_lower:
+            self.recovery_state = True
+
+        if self.recovery_state and self.shutdown_state:
+            self.validade_short_test(True)
+        else:
+            self.short_test_cycle += 1
+            QTimer.singleShot(500, self.check_short_state)
 
     def set_fixed_step_values(self, step: Step):
         for monitor in self.test_setup.channels:
@@ -455,6 +513,26 @@ class MainWindow(QMainWindow):
         self.steps_table.set_step_status(step_pass)
         self.test_setup.test_sequence_status.append(step_pass)
         self.handle_test_data(tuple(current_step_data), step_pass)
+
+    def validade_short_test(self, step_pass: bool):
+        current_step_data = []
+
+        for channel in self.test_setup.channels:
+            channel_data = {
+                "channel_id": str(channel.channel_id),
+                "voltage_ref": self.short_test_params.voltage_lower,
+                "shutdown": self.shutdown_state,
+                "recovery": self.recovery_state,
+                "load": self.short_test_params.static_load,
+            }
+
+            current_step_data.append(channel_data)
+
+        self.steps_table.set_step_status(step_pass)
+        self.test_setup.test_sequence_status.append(step_pass)
+        self.handle_test_data(tuple(current_step_data), step_pass)
+        self.test_setup.current_index += 1
+        self.run_steps()
 
     def handle_test_data(self, data: tuple, step_status: bool) -> None:
         current_step = self.test_setup.active_test.steps[self.test_setup.current_index]

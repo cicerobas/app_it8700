@@ -13,6 +13,7 @@ class ElectronicLoadController:
         self.conn_status = False
         self.inst_id = ""
         self.inst_resource = self.setup_connection()
+        self.active_channel = 0
 
     def setup_connection(self):
         if DEFAULT_INST_PATH in self.rm.list_resources():
@@ -35,6 +36,9 @@ class ElectronicLoadController:
         return self.inst_resource.query(command)
 
     def select_channel(self, channel_id: int) -> None:
+        if self.active_channel == channel_id:
+            return
+        self.active_channel = channel_id
         self._sat_write(f"{SELECT_CHANNEL}{channel_id}")
 
     def toggle_active_channels_input(self, channels: list[int], state: bool) -> None:
@@ -50,3 +54,7 @@ class ElectronicLoadController:
         self.select_channel(channel_id)
         self._sat_write(f"{SET_CURR}{load}")
         sleep(0.1)
+
+    def toggle_short_mode(self, channel_id:int, state:bool)->None:
+        self.select_channel(channel_id)
+        self._sat_write(SHORT_ON if state else SHORT_OFF)
