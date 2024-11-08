@@ -37,6 +37,7 @@ from widgets.steps_table import StepsTable
 from widgets.data_input_dialog import DataInputDialog
 from widgets.test_result_view import TestResultView
 from widgets.test_setup_view import TestSetupView
+from widgets.test_edit_view import TestEditView
 from utils.delay_manager import DelayManager
 from utils.monitor_worker import MonitorWorker
 from utils.enums import *
@@ -79,7 +80,8 @@ class MainWindow(QMainWindow):
         self.delay_manager = DelayManager()
         self.steps_table = StepsTable()
         self.test_result_view = TestResultView()
-        self.test_setup_view = TestSetupView(self.arduino_controller)
+        self.test_edit_view = TestEditView(self)
+        self.test_setup_view = TestSetupView(self.arduino_controller, self)
         self.monitoring_worker = None
         self.temp_file = None
         self.temp_file_name = ""
@@ -104,11 +106,17 @@ class MainWindow(QMainWindow):
         self.start_shortcut.activated.connect(self.start_test_sequence)
         self.pause_shortcut.activated.connect(self.toggle_test_pause)
         self.stop_shortcut.activated.connect(self.cancel_test_sequence)
-        self.single_run_shortcut.activated.connect(self.handle_single__run)
+        self.single_run_shortcut.activated.connect(self.handle_single_run)
 
         # Actions
         self.open_file_action = QAction(
-            QIcon("assets/icons/file_open.png"), "Abrir Arquivo", self
+            QIcon("assets/icons/file_open.png"), "Abrir...", self
+        )
+        self.new_file_action = QAction(
+            QIcon("assets/icons/file_add.png"), "Novo...", self
+        )
+        self.edit_file_action = QAction(
+            QIcon("assets/icons/file_edit.png"), "Editar...", self
         )
         self.test_result_action = QAction(
             QIcon("assets/icons/description.png"), "Resultado", self
@@ -123,13 +131,20 @@ class MainWindow(QMainWindow):
         self.test_setup_action.setShortcut(Qt.Key.Key_F4)
 
         self.open_file_action.triggered.connect(self.open_test_file)
-        self.test_result_action.triggered.connect(self.handle_test_result_view)
-        self.test_setup_action.triggered.connect(self.handle_test_setup_view)
+        self.new_file_action.triggered.connect(
+            lambda e: self.open_window(self.test_edit_view)
+        )
+        self.test_result_action.triggered.connect(self.test_result_view.show)
+        self.test_setup_action.triggered.connect(
+            lambda e: self.open_window(self.test_setup_view)
+        )
 
         # Menu
         menu = self.menuBar()
         file_menu = menu.addMenu("&Arquivo")
         file_menu.addAction(self.open_file_action)
+        file_menu.addAction(self.new_file_action)
+        file_menu.addAction(self.edit_file_action)
 
         test_menu = menu.addMenu("&Teste")
         test_menu.addAction(self.test_result_action)
@@ -198,7 +213,7 @@ class MainWindow(QMainWindow):
         divider = QFrame()
         divider.setFrameShape(QFrame.Shape.HLine)
         divider.setFrameShadow(QFrame.Shadow.Sunken)
-        divider.setStyleSheet("background-color: black;")
+        divider.setStyleSheet("background-color: grey;")
 
         self.v_channels_display_layout.setAlignment(
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop
@@ -216,6 +231,10 @@ class MainWindow(QMainWindow):
 
         main_container_widget.setLayout(v_main_container_layout)
         self.setCentralWidget(main_container_widget)
+
+    def open_window(self, window: QWidget) -> None:
+        self.hide()
+        window.showMaximized()
 
     def start_test_sequence(self):
         if self.state in [TestState.RUNNING, TestState.PAUSED, TestState.WAITKEY]:
@@ -361,11 +380,7 @@ class MainWindow(QMainWindow):
         if self.state is TestState.CANCELED:
             return
         channel = next(
-            (
-                c
-                for c in self.test_setup.channels
-                if c.channel_id == self.cl_channel_id
-            ),
+            (c for c in self.test_setup.channels if c.channel_id == self.cl_channel_id),
             None,
         )
         if not self.cl_step_done:
@@ -544,7 +559,7 @@ class MainWindow(QMainWindow):
         }
         self.test_setup.test_result_data["steps"].append(step_data)
 
-    def handle_single__run(self):
+    def handle_single_run(self):
         if self.steps_table.currentRow() >= 0:
             self.test_setup.is_single_step = True
             self.test_setup.selected_step_index = self.steps_table.currentRow()
@@ -693,12 +708,6 @@ class MainWindow(QMainWindow):
         if self.temp_file:
             with open(self.temp_file_name, "r", encoding="utf-8") as file:
                 return file.read()
-
-    def handle_test_result_view(self):
-        self.test_result_view.show()
-
-    def handle_test_setup_view(self):
-        self.test_setup_view.show()
 
     def keyPressEvent(self, event: QKeyEvent):
         if self.state is TestState.WAITKEY and event.key() in [

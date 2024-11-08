@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 from dataclasses import dataclass, field
 
 
@@ -16,6 +16,22 @@ class LoadParameter:
     increase_step: Optional[float] = None
     increase_delay: Optional[float] = None
 
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'LoadParameter':
+        return cls(
+            id=data['id'],
+            tag=data['tag'],
+            voltage_under_limit=data.get('voltage_under_limit'),
+            voltage_upper=data.get('voltage_upper'),
+            voltage_lower=data.get('voltage_lower'),
+            static_load=data.get('static_load'),
+            end_load=data.get('end_load'),
+            load_upper=data.get('load_upper'),
+            load_lower=data.get('load_lower'),
+            increase_step=data.get('increase_step'),
+            increase_delay=data.get('increase_delay')
+        )
+
 
 @dataclass
 class ChannelConfiguration:
@@ -30,7 +46,6 @@ class Step:
     duration: float
     input_source: int
     channels_configuration: Dict[int, LoadParameter]
-
 
 @dataclass
 class ActiveChannel:
@@ -55,7 +70,6 @@ class TestData:
         self.load_parameters = [LoadParameter(**item) for item in self.load_parameters]
         parameters_mapping = {param.id: param for param in self.load_parameters}
 
-        # Initialize steps with updated channels_configuration
         self.steps = [
             Step(
                 step_type=item["step_type"],

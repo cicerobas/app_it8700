@@ -1,5 +1,6 @@
 import yaml
 from PySide6.QtWidgets import (
+    QMainWindow,
     QVBoxLayout,
     QHBoxLayout,
     QWidget,
@@ -18,8 +19,9 @@ from controllers.arduino_controller import ArduinoController
 
 
 class TestSetupView(QWidget):
-    def __init__(self, arduino: ArduinoController):
+    def __init__(self, arduino: ArduinoController, main_window:QMainWindow):
         super().__init__()
+        self.main_window = main_window
         self.arduino_controller = arduino
         self.file_path = None
         self.data = None
@@ -160,5 +162,6 @@ class TestSetupView(QWidget):
     def closeEvent(self, event: QCloseEvent) -> None:
         if self.selected_input is not None:
             self.arduino_controller.set_acctive_pin(True)
-            
+        
+        self.main_window.show()
         event.accept()
