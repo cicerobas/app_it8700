@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from controllers.arduino_controller import ArduinoController
+from utils.assets_res_path import resource_path
 
 
 def custom_channel_label(channel_id: int, text: str) -> QLabel:
@@ -54,7 +55,9 @@ class TestSetupView(QWidget):
         self.input_1 = QRadioButton()
         self.input_2 = QRadioButton()
         self.input_3 = QRadioButton()
-        self.test_input_button = QPushButton(QIcon("assets/icons/bolt.png"), "Testar")
+        self.test_input_button = QPushButton(
+            QIcon(resource_path("assets/icons/bolt.png")), "Testar"
+        )
         self.test_input_button.clicked.connect(self.test_input_source)
 
         self.v_inputs_layout = QVBoxLayout()
@@ -79,7 +82,9 @@ class TestSetupView(QWidget):
         self.v_notes_layout = QVBoxLayout()
         self.text_edit = QPlainTextEdit()
         self.text_edit.setFont(QFont("Courier New", 14))
-        self.save_button = QPushButton(QIcon("assets/icons/save.png"), "Salvar")
+        self.save_button = QPushButton(
+            QIcon(resource_path("assets/icons/save.png")), "Salvar"
+        )
         self.save_button.setFixedWidth(100)
         self.save_button.setEnabled(False)
         self.save_button.clicked.connect(self.save_changes)

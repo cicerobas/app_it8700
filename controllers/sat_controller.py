@@ -1,6 +1,7 @@
 from time import sleep
 
 import pyvisa
+import pyvisa_py
 
 from utils.scpi_commands import *
 
@@ -10,7 +11,7 @@ DEFAULT_INST_PATH = "ASRL/dev/ttyUSB0::INSTR"
 
 class ElectronicLoadController:
     def __init__(self):
-        self.rm = pyvisa.ResourceManager()
+        self.rm = pyvisa.ResourceManager("@py")
         self.conn_status = False
         self.inst_id = ""
         self.inst_resource = self.setup_connection()

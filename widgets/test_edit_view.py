@@ -26,6 +26,8 @@ from PySide6.QtWidgets import (
     QFileDialog,
 )
 
+from utils.assets_res_path import resource_path
+
 
 class TestSetup:
     _group: str = ""
@@ -479,10 +481,16 @@ class StepsTable(QTableWidget):
     def custom_actions_widget(self) -> QWidget:
         actions_widget = QWidget()
         layout = QHBoxLayout()
-        edit_bt = custom_action_button(QIcon("assets/icons/edit.png"))
-        remove_bt = custom_action_button(QIcon("assets/icons/delete.png"))
-        swap_bt = custom_action_button(QIcon("assets/icons/swap_vert.png"))
-        copy_bt = custom_action_button(QIcon("assets/icons/content_copy.png"))
+        edit_bt = custom_action_button(QIcon(resource_path("assets/icons/edit.png")))
+        remove_bt = custom_action_button(
+            QIcon(resource_path("assets/icons/delete.png"))
+        )
+        swap_bt = custom_action_button(
+            QIcon(resource_path("assets/icons/swap_vert.png"))
+        )
+        copy_bt = custom_action_button(
+            QIcon(resource_path("assets/icons/content_copy.png"))
+        )
         remove_bt.clicked.connect(self.remove_item)
         swap_bt.clicked.connect(self.show_position_swap_dialog)
         edit_bt.clicked.connect(self.edit_item)
@@ -540,8 +548,10 @@ class ParamsTable(QTableWidget):
     def custom_actions_widget(self) -> QWidget:
         actions_widget = QWidget()
         layout = QHBoxLayout()
-        edit_bt = custom_action_button(QIcon("assets/icons/edit.png"))
-        remove_bt = custom_action_button(QIcon("assets/icons/delete.png"))
+        edit_bt = custom_action_button(QIcon(resource_path("assets/icons/edit.png")))
+        remove_bt = custom_action_button(
+            QIcon(resource_path("assets/icons/delete.png"))
+        )
         remove_bt.clicked.connect(self.remove_param)
         edit_bt.clicked.connect(self.edit_param)
         layout.addWidget(edit_bt)

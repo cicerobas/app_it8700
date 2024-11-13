@@ -35,6 +35,7 @@ from utils.delay_manager import DelayManager
 from utils.enums import *
 from utils.monitor_worker import MonitorWorker
 from utils.report_file import *
+from utils.assets_res_path import resource_path
 from widgets.channel_monitor import ChannelMonitor
 from widgets.data_input_dialog import DataInputDialog
 from widgets.steps_table import StepsTable
@@ -120,19 +121,19 @@ class MainWindow(QMainWindow):
 
         # Actions
         self.open_file_action = QAction(
-            QIcon("assets/icons/file_open.png"), "Abrir...", self
+            QIcon(resource_path("assets/icons/file_open.png")), "Abrir...", self
         )
         self.new_file_action = QAction(
-            QIcon("assets/icons/file_add.png"), "Novo...", self
+            QIcon(resource_path("assets/icons/file_add.png")), "Novo...", self
         )
         self.edit_file_action = QAction(
-            QIcon("assets/icons/file_edit.png"), "Editar...", self
+            QIcon(resource_path("assets/icons/file_edit.png")), "Editar...", self
         )
         self.test_result_action = QAction(
-            QIcon("assets/icons/description.png"), "Resultado", self
+            QIcon(resource_path("assets/icons/description.png")), "Resultado", self
         )
         self.test_setup_action = QAction(
-            QIcon("assets/icons/settings.png"), "Configuração", self
+            QIcon(resource_path("assets/icons/settings.png")), "Configuração", self
         )
         self.test_setup_action.setEnabled(False)
 
@@ -159,7 +160,7 @@ class MainWindow(QMainWindow):
 
         # Logo
         logo = QLabel()
-        logo.setPixmap(QPixmap("assets/logo.png"))
+        logo.setPixmap(QPixmap(resource_path("assets/logo.png")))
         logo.setScaledContents(True)
         logo.setFixedSize(150, 100)
 
