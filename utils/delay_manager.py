@@ -20,7 +20,7 @@ class DelayManager(QObject):
             self.run_timer()
         else:
             self.paused = True
-        
+
     def run_timer(self):
         if self.paused:
             return
@@ -30,4 +30,3 @@ class DelayManager(QObject):
             QTimer.singleShot(100, self.run_timer)
         else:
             self.delay_completed.emit()
-

@@ -1,5 +1,6 @@
 import serial
 
+
 class Arduino:
     """
     Models an Arduino connection

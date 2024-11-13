@@ -1,3 +1,8 @@
+from typing import Dict
+
+import yaml
+from PySide6.QtCore import QSize, Qt
+from PySide6.QtGui import QFont, QIcon
 from PySide6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
@@ -20,10 +25,6 @@ from PySide6.QtWidgets import (
     QDoubleSpinBox,
     QFileDialog,
 )
-from PySide6.QtCore import QSize, Qt
-from PySide6.QtGui import QFont, QIcon
-
-import yaml
 
 
 class TestSetup:
@@ -70,7 +71,7 @@ class TestSetup:
         return cls._input_type
 
     @classmethod
-    def set_input_sources(cls, values: list[str]):
+    def set_input_sources(cls, values: list[int]):
         cls._input_sources = values
 
     @classmethod
@@ -100,8 +101,8 @@ class TestSetup:
             param.update({"id": index + 1, "increase_delay": 0.5})
             cls._params_list.insert(index, param)
         else:
-            id = len(cls._params_list) + 1
-            param.update({"id": id, "increase_delay": 0.5})
+            param_id = len(cls._params_list) + 1
+            param.update({"id": param_id, "increase_delay": 0.5})
             cls._params_list.append(param)
 
     @classmethod
@@ -149,11 +150,41 @@ class TestSetup:
             "notes": cls._notes,
         }
 
+    @classmethod
+    def load_from_data(cls, data: Dict):
+        cls._group = data.get("group", "")
+        cls._model = data.get("model", "")
+        cls._customer = data.get("customer", "")
+        cls._input_type = data.get("input_type", "CC")
+        cls._notes = data.get("notes", "")
+        cls._input_sources = data.get("input_sources", [0, 0, 0])
+        cls._active_channels = {
+            channel["id"]: channel["label"]
+            for channel in data.get("active_channels", [])
+        }
+        cls._params_list.clear()
+        for param in data.get("load_parameters", []):
+            cls.add_param(param)
+        cls._step_list = data.get("steps", [])
+
+    @classmethod
+    def reset(cls):
+        cls._group = ""
+        cls._model = ""
+        cls._customer = ""
+        cls._input_type = "CC"
+        cls._notes = ""
+        cls._input_sources = [0, 0, 0]
+        cls._step_list.clear()
+        cls._active_channels.clear()
+        cls._params_list.clear()
+
 
 class TestEditView(QWidget):
-    def __init__(self, main_window: QMainWindow = None):
+    def __init__(self, main_window: QMainWindow, edit_file_path: str = ""):
         super().__init__()
         self.main_window = main_window
+        self.edit_file_path = edit_file_path
         self.setWindowTitle("CEBRA - Test Configuration")
         self.setFont(QFont("Arial", 14))
         self.setMinimumSize(QSize(1280, 600))
@@ -263,6 +294,40 @@ class TestEditView(QWidget):
         main_layout.addWidget(params_gb)
         self.setLayout(main_layout)
 
+    def load_test_data(self):
+        with open(self.edit_file_path, "r") as loaded_file:
+            test_data = yaml.safe_load(loaded_file.read())
+            TestSetup.load_from_data(test_data)
+            self.set_fields_data()
+
+    def set_fields_data(self):
+        self.group_field.setText(TestSetup.get_group())
+        self.model_field.setText(TestSetup.get_model())
+        self.customer_field.setText(TestSetup.get_customer())
+        (
+            self.input_type_cc.setChecked(True)
+            if TestSetup.get_input_type() == "CC"
+            else self.input_type_ca.setChecked(True)
+        )
+        input_sources = TestSetup.get_input_sources()
+        self.v1_input_field.setText(str(input_sources[0]))
+        self.v2_input_field.setText(str(input_sources[1]))
+        self.v3_input_field.setText(str(input_sources[2]))
+        active_channels = TestSetup.get_active_channels_list()
+        for channel_id in active_channels.keys():
+            match channel_id:
+                case 1:
+                    self.ch1_cb.setChecked(True)
+                    self.ch1_field.setText(active_channels.get(channel_id))
+                case 3:
+                    self.ch3_cb.setChecked(True)
+                    self.ch3_field.setText(active_channels.get(channel_id))
+                case 4:
+                    self.ch4_cb.setChecked(True)
+                    self.ch4_field.setText(active_channels.get(channel_id))
+        self.params_table.refresh_table()
+        self.steps_table.refresh_table()
+
     def save_file(self):
         self.toggle_active_channels()
         directory_path = QFileDialog.getExistingDirectory(
@@ -279,6 +344,7 @@ class TestEditView(QWidget):
                     default_flow_style=False,
                     sort_keys=False,
                 )
+        self.close()
 
     def closeEvent(self, event) -> None:
         self.main_window.show()
@@ -334,6 +400,24 @@ class TestEditView(QWidget):
             data = dlg.get_data()
             self.params_table.add_param(data)
 
+    def show(self, file_path: str = None) -> None:
+        if file_path:
+            self.edit_file_path = file_path
+            self.load_test_data()
+        else:
+            TestSetup.reset()
+
+        return super().showMaximized()
+
+
+def custom_action_button(icon: QIcon) -> QPushButton:
+    button = QPushButton()
+    button.setFixedSize(QSize(32, 32))
+    button.setFlat(True)
+    button.setIconSize(button.sizeHint())
+    button.setIcon(icon)
+    return button
+
 
 class StepsTable(QTableWidget):
     def __init__(self):
@@ -341,7 +425,7 @@ class StepsTable(QTableWidget):
         self.setRowCount(0)
         self.setColumnCount(2)
         self.setHorizontalHeaderLabels(["Descrição", "Ações"])
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
         self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
@@ -375,6 +459,11 @@ class StepsTable(QTableWidget):
             TestSetup.add_step(dlg.get_old_data(), index)
         self.refresh_table()
 
+    def duplicate_item(self) -> None:
+        index = self.sender().parent().property("row")
+        TestSetup.add_step(TestSetup.get_step_list()[index])
+        self.refresh_table()
+
     def update_item_position(self, index: int, new_index: int) -> None:
         item = TestSetup.pop_step(index)
         TestSetup.add_step(item, new_index)
@@ -390,27 +479,22 @@ class StepsTable(QTableWidget):
     def custom_actions_widget(self) -> QWidget:
         actions_widget = QWidget()
         layout = QHBoxLayout()
-        edit_bt = self.custom_action_button(QIcon("assets/icons/edit.png"))
-        remove_bt = self.custom_action_button(QIcon("assets/icons/delete.png"))
-        swapt_bt = self.custom_action_button(QIcon("assets/icons/swap_vert.png"))
+        edit_bt = custom_action_button(QIcon("assets/icons/edit.png"))
+        remove_bt = custom_action_button(QIcon("assets/icons/delete.png"))
+        swap_bt = custom_action_button(QIcon("assets/icons/swap_vert.png"))
+        copy_bt = custom_action_button(QIcon("assets/icons/content_copy.png"))
         remove_bt.clicked.connect(self.remove_item)
-        swapt_bt.clicked.connect(self.show_position_swap_dialog)
+        swap_bt.clicked.connect(self.show_position_swap_dialog)
         edit_bt.clicked.connect(self.edit_item)
+        copy_bt.clicked.connect(self.duplicate_item)
         layout.addWidget(edit_bt)
         layout.addWidget(remove_bt)
-        layout.addWidget(swapt_bt)
+        layout.addWidget(swap_bt)
+        layout.addWidget(copy_bt)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.setContentsMargins(0, 0, 0, 0)
         actions_widget.setLayout(layout)
         return actions_widget
-
-    def custom_action_button(self, icon: QIcon) -> QPushButton:
-        button = QPushButton()
-        button.setFixedSize(QSize(32, 32))
-        button.setFlat(True)
-        button.setIconSize(button.sizeHint())
-        button.setIcon(icon)
-        return button
 
 
 class ParamsTable(QTableWidget):
@@ -419,7 +503,7 @@ class ParamsTable(QTableWidget):
         self.setRowCount(0)
         self.setColumnCount(2)
         self.setHorizontalHeaderLabels(["Descrição", "Ações"])
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
         self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
@@ -456,8 +540,8 @@ class ParamsTable(QTableWidget):
     def custom_actions_widget(self) -> QWidget:
         actions_widget = QWidget()
         layout = QHBoxLayout()
-        edit_bt = self.custom_action_button(QIcon("assets/icons/edit.png"))
-        remove_bt = self.custom_action_button(QIcon("assets/icons/delete.png"))
+        edit_bt = custom_action_button(QIcon("assets/icons/edit.png"))
+        remove_bt = custom_action_button(QIcon("assets/icons/delete.png"))
         remove_bt.clicked.connect(self.remove_param)
         edit_bt.clicked.connect(self.edit_param)
         layout.addWidget(edit_bt)
@@ -466,14 +550,6 @@ class ParamsTable(QTableWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         actions_widget.setLayout(layout)
         return actions_widget
-
-    def custom_action_button(self, icon: QIcon) -> QPushButton:
-        button = QPushButton()
-        button.setFixedSize(QSize(32, 32))
-        button.setFlat(True)
-        button.setIconSize(button.sizeHint())
-        button.setIcon(icon)
-        return button
 
 
 class SelectPositionDialog(QDialog):
@@ -486,7 +562,9 @@ class SelectPositionDialog(QDialog):
         self.spinbox.setMaximum(list_length)
         self.spinbox.lineEdit().setReadOnly(True)
 
-        buttons = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+        buttons = (
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
         self.buttonBox = QDialogButtonBox(buttons)
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
@@ -500,6 +578,15 @@ class SelectPositionDialog(QDialog):
         return self.spinbox.value() - 1
 
 
+def custom_spinbox(suffix: str) -> QDoubleSpinBox:
+    spinbox = QDoubleSpinBox()
+    spinbox.setMinimum(0)
+    spinbox.setMaximum(80)
+    spinbox.setSuffix(suffix)
+
+    return spinbox
+
+
 class ParamDetailsDialog(QDialog):
     def __init__(
         self,
@@ -507,6 +594,7 @@ class ParamDetailsDialog(QDialog):
         edit_index: int = -1,
     ):
         super().__init__()
+        self.old_data = None
         self.params_list = TestSetup.get_params_list()
         self.is_edit = is_edit
         self.edit_index = edit_index
@@ -514,16 +602,18 @@ class ParamDetailsDialog(QDialog):
         self.setFont(QFont("Arial", 14))
 
         self.tag_field = QLineEdit()
-        self.voltage_under_sb = self.custom_spinbox("V")
-        self.voltage_upper_sb = self.custom_spinbox("V")
-        self.voltage_lower_sb = self.custom_spinbox("V")
-        self.static_load_sb = self.custom_spinbox("A")
-        self.end_load_sb = self.custom_spinbox("A")
-        self.load_upper_sb = self.custom_spinbox("A")
-        self.load_lower_sb = self.custom_spinbox("A")
-        self.load_increase_step_sb = self.custom_spinbox("A")
+        self.voltage_under_sb = custom_spinbox("V")
+        self.voltage_upper_sb = custom_spinbox("V")
+        self.voltage_lower_sb = custom_spinbox("V")
+        self.static_load_sb = custom_spinbox("A")
+        self.end_load_sb = custom_spinbox("A")
+        self.load_upper_sb = custom_spinbox("A")
+        self.load_lower_sb = custom_spinbox("A")
+        self.load_increase_step_sb = custom_spinbox("A")
 
-        buttons = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+        buttons = (
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
         self.buttonBox = QDialogButtonBox(buttons)
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
@@ -586,14 +676,6 @@ class ParamDetailsDialog(QDialog):
             "increase_step": self.load_increase_step_sb.value(),
         }
 
-    def custom_spinbox(self, suffix: str) -> QDoubleSpinBox:
-        spinbox = QDoubleSpinBox()
-        spinbox.setMinimum(0)
-        spinbox.setMaximum(80)
-        spinbox.setSuffix(suffix)
-
-        return spinbox
-
 
 class StepDetailsDialog(QDialog):
     def __init__(
@@ -602,6 +684,7 @@ class StepDetailsDialog(QDialog):
         edit_index: int = -1,
     ):
         super().__init__()
+        self.old_data = None
         self.params_list = TestSetup.get_params_list()
         self.active_channels = TestSetup.get_active_channels_list().keys()
         self.is_edit = is_edit
@@ -639,7 +722,9 @@ class StepDetailsDialog(QDialog):
         self.ch3_param_cb.addItems(params_list)
         self.ch4_param_cb.addItems(params_list)
 
-        buttons = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+        buttons = (
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
         self.buttonBox = QDialogButtonBox(buttons)
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)

@@ -1,9 +1,10 @@
-from PySide6.QtWidgets import QVBoxLayout, QWidget, QPlainTextEdit
 from PySide6.QtCore import QSize
 from PySide6.QtGui import QFont
+from PySide6.QtWidgets import QVBoxLayout, QWidget, QPlainTextEdit
+
 
 class TestResultView(QWidget):
-    def __init__(self, text:str = ""):
+    def __init__(self, text: str = ""):
         super().__init__()
         self.text = text
         self.text_edit = QPlainTextEdit()

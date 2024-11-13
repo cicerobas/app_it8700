@@ -1,6 +1,6 @@
-from PySide6.QtWidgets import QTableWidget, QTableWidgetItem
-from PySide6.QtGui import QFont, QColor, QBrush
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont, QColor, QBrush
+from PySide6.QtWidgets import QTableWidget, QTableWidgetItem
 
 from models.test_file_model import Step
 
@@ -11,6 +11,10 @@ class StepsTable(QTableWidget):
         self.setFont(QFont("Arial", 14))
         self.setRowCount(0)
         self.setColumnCount(3)
+        self.setFixedWidth(520)
+        self.setColumnWidth(0, 300)
+        self.setColumnWidth(1, 100)
+        self.setColumnWidth(2, 100)
         self.setHorizontalHeaderLabels(["Descrição", "Tempo", "Status"])
         self.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)

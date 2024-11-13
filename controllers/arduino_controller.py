@@ -1,5 +1,6 @@
-import pyvisa
 from time import sleep
+
+import pyvisa
 
 from utils.arduino_interface import Arduino
 
@@ -36,7 +37,7 @@ class ArduinoController:
         """
         return True if self.arduino is not None else False
 
-    def set_acctive_pin(self, reset: bool) -> None:
+    def set_active_pin(self, reset: bool) -> None:
         """
         Receives a reset(bool) value, if reset is true, set all pins to off,
          else sets any true value pin in output_pins(dict) to on.
@@ -79,10 +80,10 @@ class ArduinoController:
         Receives active_pin(str) and set its equivalent value to true in output_pins(dict).
         No return.
         """
-        self.set_acctive_pin(True)
+        self.set_active_pin(True)
         for pin in self.output_pins:
             self.output_pins[pin] = pin == active_pin
-        self.set_acctive_pin(False)
+        self.set_active_pin(False)
 
     def buzzer(self) -> bool:
         self.arduino.set_pin_mode("10", "O")

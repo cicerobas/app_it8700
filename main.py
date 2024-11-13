@@ -1,8 +1,8 @@
-import sys
 import os
-import yaml
+import sys
 from time import sleep
 
+import yaml
 from PySide6.QtCore import QSize, Qt, QTimer, QThreadPool, Slot, Signal, QObject
 from PySide6.QtGui import (
     QAction,
@@ -24,38 +24,38 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QGridLayout,
-    QSizePolicy,
     QLineEdit,
     QFrame,
 )
 
-from controllers.sat_controller import ElectronicLoadController
 from controllers.arduino_controller import ArduinoController
+from controllers.sat_controller import ElectronicLoadController
 from models.test_file_model import *
+from utils.delay_manager import DelayManager
+from utils.enums import *
+from utils.monitor_worker import MonitorWorker
+from utils.report_file import *
 from widgets.channel_monitor import ChannelMonitor
-from widgets.steps_table import StepsTable
 from widgets.data_input_dialog import DataInputDialog
+from widgets.steps_table import StepsTable
+from widgets.test_edit_view import TestEditView
 from widgets.test_result_view import TestResultView
 from widgets.test_setup_view import TestSetupView
-from widgets.test_edit_view import TestEditView
-from utils.delay_manager import DelayManager
-from utils.monitor_worker import MonitorWorker
-from utils.enums import *
-from utils.report_file import *
 
 
 class CurrentTestSetup:
-    active_test: TestData = None
-    directory_path: str = ""
-    serial_number: str = None
-    operator_name: str = ""
-    channels: list[ChannelMonitor] = []
-    serial_number_changed: bool = False
-    is_single_step: bool = False
-    selected_step_index: int = -1
-    current_index: int = 0
-    test_result_data = dict()
-    test_sequence_status: list[bool] = []
+    def __init__(self):
+        self.active_test: TestData | None = None
+        self.directory_path: str = ""
+        self.serial_number: str | None = None
+        self.operator_name: str = ""
+        self.channels: list[ChannelMonitor] = []
+        self.serial_number_changed: bool = False
+        self.is_single_step: bool = False
+        self.selected_step_index: int = -1
+        self.current_index: int = 0
+        self.test_result_data = dict()
+        self.test_sequence_status: list[bool] = []
 
     def set_next_serial_number(self):
         self.serial_number = str(int(self.serial_number) + 1).zfill(8)
@@ -71,6 +71,15 @@ class WorkerSignals(QObject):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.cl_channel_id = None
+        self.cl_step_params = None
+        self.current_load = None
+        self.cl_step_done = None
+        self.short_test_channel = None
+        self.short_test_cycle = None
+        self.short_test_params = None
+        self.shutdown_state = None
+        self.recovery_state = None
         self.test_setup = CurrentTestSetup()
         self.state = TestState.NONE
         self.sat_controller = ElectronicLoadController()
@@ -79,6 +88,7 @@ class MainWindow(QMainWindow):
         self.worker_signals = WorkerSignals()
         self.delay_manager = DelayManager()
         self.steps_table = StepsTable()
+        self.steps_table.setVisible(False)
         self.test_result_view = TestResultView()
         self.test_edit_view = TestEditView(self)
         self.test_setup_view = TestSetupView(self.arduino_controller, self)
@@ -131,13 +141,10 @@ class MainWindow(QMainWindow):
         self.test_setup_action.setShortcut(Qt.Key.Key_F4)
 
         self.open_file_action.triggered.connect(self.open_test_file)
-        self.new_file_action.triggered.connect(
-            lambda e: self.open_window(self.test_edit_view)
-        )
+        self.new_file_action.triggered.connect(lambda e: self.open_window(0))
+        self.edit_file_action.triggered.connect(lambda e: self.open_window(1))
         self.test_result_action.triggered.connect(self.test_result_view.show)
-        self.test_setup_action.triggered.connect(
-            lambda e: self.open_window(self.test_setup_view)
-        )
+        self.test_setup_action.triggered.connect(lambda e: self.open_window(2))
 
         # Menu
         menu = self.menuBar()
@@ -232,9 +239,26 @@ class MainWindow(QMainWindow):
         main_container_widget.setLayout(v_main_container_layout)
         self.setCentralWidget(main_container_widget)
 
-    def open_window(self, window: QWidget) -> None:
+    def reset_window(self):
+        self.test_setup = CurrentTestSetup()
+
+    def open_window(self, window_id: int) -> None:
         self.hide()
-        window.showMaximized()
+        match window_id:
+            case 0:
+                self.test_edit_view.show()
+                self.reset_window()
+            case 1:
+                file_path, _ = QFileDialog.getOpenFileName(
+                    self, "Abrir arquivo de teste...", "", "Arquivos YAML (*.yaml)"
+                )
+                if file_path:
+                    self.test_edit_view.show(file_path)
+                    self.reset_window()
+                else:
+                    self.show()
+            case 2:
+                self.test_setup_view.showMaximized()
 
     def start_test_sequence(self):
         if self.state in [TestState.RUNNING, TestState.PAUSED, TestState.WAITKEY]:
@@ -307,7 +331,6 @@ class MainWindow(QMainWindow):
         self.reset_setup()
 
     def run_steps(self):
-        steps: list[Step] = []
         if self.test_setup.is_single_step:
             steps = [
                 self.test_setup.active_test.steps[self.test_setup.selected_step_index]
@@ -360,8 +383,8 @@ class MainWindow(QMainWindow):
             self.reset_setup()
 
     def cc_test_mode(self, step: Step):
-        for id, params in step.channels_configuration.items():
-            self.update_current_load(id, params.static_load)
+        for channel_id, params in step.channels_configuration.items():
+            self.update_current_load(channel_id, params.static_load)
         if step.duration == 0:
             self.state = TestState.WAITKEY
             self.update_status_label(step.description)
@@ -391,7 +414,7 @@ class MainWindow(QMainWindow):
                 self.current_load += self.cl_step_params.increase_step
                 self.update_current_load(self.cl_channel_id, self.current_load)
                 QTimer.singleShot(
-                    self.cl_step_params.increase_delay * 1000,
+                    int(self.cl_step_params.increase_delay * 1000),
                     self.handle_increase_steps,
                 )
             else:
@@ -423,10 +446,10 @@ class MainWindow(QMainWindow):
         self.check_short_state()
 
     def check_short_state(self):
-        VOLTAGE_SHUTDOWN_FACTOR = 0.2
-        SHORT_TEST_MAX_CYCLE = 30
+        voltage_shutdown_factor = 0.2
+        short_test_max_cycle = 30
 
-        if self.short_test_cycle >= SHORT_TEST_MAX_CYCLE:
+        if self.short_test_cycle >= short_test_max_cycle:
             self.validade_short_test(False)
             return
         channel = next(
@@ -447,7 +470,7 @@ class MainWindow(QMainWindow):
 
         if (
             not self.shutdown_state
-            and voltage_output < voltage_lower * VOLTAGE_SHUTDOWN_FACTOR
+            and voltage_output < voltage_lower * voltage_shutdown_factor
         ):
             self.shutdown_state = True
             self.sat_controller.toggle_short_mode(self.short_test_channel, False)
@@ -569,7 +592,7 @@ class MainWindow(QMainWindow):
         self.sat_controller.toggle_active_channels_input(
             self.test_setup.get_active_channel_ids(), False
         )
-        self.arduino_controller.set_acctive_pin(True)
+        self.arduino_controller.set_active_pin(True)
         self.monitoring_worker.pause()
         self.delay_manager.paused = False
         self.delay_manager.remaining_time = 0
@@ -606,11 +629,11 @@ class MainWindow(QMainWindow):
                 self.sat_controller.get_channel_value(channel.channel_id)
             )
 
-    def update_current_load(self, id, load):
+    def update_current_load(self, channel_id, load):
         for channel in self.test_setup.channels:
-            if channel.channel_id == id:
+            if channel.channel_id == channel_id:
                 channel.update_load_value(load)
-                self.sat_controller.set_channel_current(id, load)
+                self.sat_controller.set_channel_current(channel_id, load)
 
     def serial_number_changed(self):
         self.test_setup.serial_number = str(
@@ -640,21 +663,12 @@ class MainWindow(QMainWindow):
         self.group_value_field.setText(self.test_setup.active_test.group)
         self.model_value_field.setText(self.test_setup.active_test.model)
         self.steps_table.update_step_list(self.test_setup.active_test.steps)
+        self.steps_table.setVisible(True)
 
         for channel in self.test_setup.active_test.active_channels:
             channel_monitor = ChannelMonitor(channel.id, channel.label)
             self.test_setup.channels.append(channel_monitor)
             self.v_channels_display_layout.addWidget(channel_monitor)
-
-        self.steps_table.resizeColumnsToContents()
-        total_width = sum(
-            self.steps_table.columnWidth(i)
-            for i in range(self.steps_table.columnCount())
-        )
-        self.steps_table.setFixedWidth(total_width + 50)
-        self.steps_table.setSizePolicy(
-            QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding
-        )
 
     def open_test_file(self):
         file_path, _ = QFileDialog.getOpenFileName(
@@ -732,28 +746,30 @@ def default_header_label(text: str) -> QLabel:
 
 
 def default_header_field(read_only: bool, focus_policy: Qt.FocusPolicy) -> QLineEdit:
-    field = QLineEdit()
-    field.setReadOnly(read_only)
-    field.setFocusPolicy(focus_policy)
-    return field
+    text_field = QLineEdit()
+    text_field.setReadOnly(read_only)
+    text_field.setFocusPolicy(focus_policy)
+    return text_field
 
 
-def show_custom_dialog(self, text: str, type: QMessageBox.Icon) -> None:
+def show_custom_dialog(self, text: str, message_type: QMessageBox.Icon) -> None:
     dlg = QMessageBox(self)
-    dlg.setWindowTitle("Informação" if type == QMessageBox.Icon.Information else "Erro")
+    dlg.setWindowTitle(
+        "Informação" if message_type == QMessageBox.Icon.Information else "Erro"
+    )
     dlg.setText(text)
     dlg.setFont(QFont("Arial", 14))
     dlg.setStandardButtons(
         QMessageBox.StandardButton.Ok
-        if type == QMessageBox.Icon.Information
+        if message_type == QMessageBox.Icon.Information
         else QMessageBox.StandardButton.Close
     )
-    dlg.setIcon(type)
+    dlg.setIcon(message_type)
     dlg.exec()
 
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
-    window.showMaximized()  # .showFullScreen()
+    window.showMaximized()
     sys.exit(app.exec())

@@ -1,11 +1,10 @@
-from PySide6.QtCore import QRunnable, QMutex, QWaitCondition, QMutexLocker
 from time import sleep
 
+from PySide6.QtCore import QRunnable, QMutex, QWaitCondition, QMutexLocker
+
+
 class MonitorWorker(QRunnable):
-    def __init__(
-        self,
-        signals
-    ):
+    def __init__(self, signals):
         super().__init__()
         self.mutex = QMutex()
         self.wait_condition = QWaitCondition()

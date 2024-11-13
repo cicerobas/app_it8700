@@ -1,5 +1,6 @@
-import pyvisa
 from time import sleep
+
+import pyvisa
 
 from utils.scpi_commands import *
 
@@ -55,6 +56,6 @@ class ElectronicLoadController:
         self._sat_write(f"{SET_CURR}{load}")
         sleep(0.1)
 
-    def toggle_short_mode(self, channel_id:int, state:bool)->None:
+    def toggle_short_mode(self, channel_id: int, state: bool) -> None:
         self.select_channel(channel_id)
         self._sat_write(SHORT_ON if state else SHORT_OFF)

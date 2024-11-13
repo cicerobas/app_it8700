@@ -27,11 +27,11 @@ def generate_report_file(data: dict):
         temp_file.write(divider)
         description = step["description"]
         status = step["status"]
-        type = step["type"]
+        step_type = step["type"]
         lines.append(
             f"|-> {description + ' ' * (55-len(description))}{'[ PASS ]' if status else '[ FAIL ]'} |\n"
         )
-        match type:
+        match step_type:
             case 1:
                 channels_line = "|" + "=" * 14
                 static_load_line = "|Load Current: "
@@ -96,7 +96,7 @@ def generate_report_file(data: dict):
                     short_load_line += f"[ {load+' '*(8-len(load))}]A "
 
         lines.append(f"{channels_line + '=' * (68 - len(channels_line))}|\n")
-        match type:
+        match step_type:
             case 1:
                 lines.append(format_line(static_load_line))
                 lines.append(format_line(voltage_upper_line))

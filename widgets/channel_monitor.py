@@ -1,3 +1,5 @@
+from PySide6.QtCore import Qt, QSize
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QLabel,
     QVBoxLayout,
@@ -6,8 +8,6 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QGroupBox,
 )
-from PySide6.QtCore import Qt, QSize
-from PySide6.QtGui import QFont
 
 
 class Data:
@@ -21,7 +21,7 @@ class Data:
 
 
 class ChannelMonitor(QGroupBox):
-    def __init__(self, channel_id:int, channel_label:str):
+    def __init__(self, channel_id: int, channel_label: str):
         super().__init__()
         self.channel_id = channel_id
         self.channel_label = channel_label
@@ -43,8 +43,8 @@ class ChannelMonitor(QGroupBox):
             self.channel_description_label, 0, Qt.AlignmentFlag.AlignRight
         )
         separator = QFrame()
-        separator.setFrameShape(QFrame.VLine)
-        separator.setFrameShadow(QFrame.Raised)
+        separator.setFrameShape(QFrame.Shape.VLine)
+        separator.setFrameShadow(QFrame.Shadow.Raised)
 
         h_values_layout = QHBoxLayout()
         h_values_layout.addWidget(
@@ -53,10 +53,13 @@ class ChannelMonitor(QGroupBox):
         h_values_layout.addWidget(separator)
         h_values_layout.addWidget(self.load_value_label, 0, Qt.AlignmentFlag.AlignRight)
         values_frame = QFrame()
-        values_frame.setFrameShape(QFrame.StyledPanel)
-        values_frame.setFrameShadow(QFrame.Raised)
+        # values_frame.setFrameShape(QFrame.StyledPanel)
+        values_frame.setFrameShape(QFrame.Shape.StyledPanel)
+        values_frame.setFrameShadow(QFrame.Shadow.Raised)
         values_frame.setLayout(h_values_layout)
-        values_frame.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Expanding)
+        values_frame.setSizePolicy(
+            QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding
+        )
 
         v_main_layout = QVBoxLayout()
         v_main_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
@@ -65,17 +68,19 @@ class ChannelMonitor(QGroupBox):
         v_main_layout.addWidget(self.step_info_label, 0, Qt.AlignmentFlag.AlignJustify)
 
         self.setLayout(v_main_layout)
-    
-    def update_step_values(self, values: list[str]) -> None:
+
+    def update_step_values(self, values: list[float | None]) -> None:
         # values = ['VoltageUpper', 'VoltageLower', 'LoadUpper', 'LoadLower']
-        self.data.voltage_upper = float(values[0]) if values[0] else 0.0
-        self.data.voltage_lower = float(values[1]) if values[1] else 0.0
-        self.data.load_upper = float(values[2]) if values[2] else 0.0
-        self.data.load_lower = float(values[3]) if values[3] else 0.0
+        self.data.voltage_upper = values[0] if values[0] else 0.0
+        self.data.voltage_lower = values[1] if values[1] else 0.0
+        self.data.load_upper = values[2] if values[2] else 0.0
+        self.data.load_lower = values[3] if values[3] else 0.0
         self.set_info_label_values()
 
     def set_info_label_values(self):
-        self.step_info_label.setText(f"V ({self.data.voltage_upper} ~ {self.data.voltage_lower})  |  A ({self.data.load_upper} ~ {self.data.load_lower})  |  Potência: {"%.2f" % self.data.power}W")
+        self.step_info_label.setText(
+            f"V ({self.data.voltage_upper} ~ {self.data.voltage_lower})  |  A ({self.data.load_upper} ~ {self.data.load_lower})  |  Potência: {"%.2f" % self.data.power}W"
+        )
 
     def update_load_value(self, value):
         self.data.load = float(value)
@@ -85,10 +90,11 @@ class ChannelMonitor(QGroupBox):
         self.data.voltage_output = float(value)
         self.voltage_value_label.setText(f'{"%.2f" % self.data.voltage_output} V')
         self.update_power_value()
-    
+
     def update_power_value(self):
         self.data.power = self.data.load * self.data.voltage_output
         self.set_info_label_values()
+
 
 def custom_label(text: str, font_size: int, weight: int) -> QLabel:
     label = QLabel(text)
