@@ -246,6 +246,7 @@ class MainWindow(QMainWindow):
         self.hide()
         match window_id:
             case 0:
+                self.test_edit_view = TestEditView(self)
                 self.test_edit_view.show()
                 self.reset_window()
             case 1:
@@ -253,6 +254,7 @@ class MainWindow(QMainWindow):
                     self, "Abrir arquivo de teste...", "", "Arquivos YAML (*.yaml)"
                 )
                 if file_path:
+                    self.test_edit_view = TestEditView(self)
                     self.test_edit_view.show(file_path)
                     self.reset_window()
                 else:
