@@ -79,7 +79,7 @@ class ChannelMonitor(QGroupBox):
 
     def set_info_label_values(self):
         self.step_info_label.setText(
-            f"V ({self.data.voltage_upper} ~ {self.data.voltage_lower})  |  A ({self.data.load_upper} ~ {self.data.load_lower})  |  Potência: {"%.2f" % self.data.power}W"
+            f'V ({self.data.voltage_upper} ~ {self.data.voltage_lower})  |  A ({self.data.load_upper} ~ {self.data.load_lower})  |  Potência: {"%.2f" % self.data.power}W'
         )
 
     def update_load_value(self, value):

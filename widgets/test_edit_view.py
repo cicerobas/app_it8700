@@ -723,7 +723,7 @@ class StepDetailsDialog(QDialog):
             ]
         )
         params_list = [
-            f"P{param.get("id")} - {param.get("tag")}" for param in self.params_list
+            f'P{param.get("id")} - {param.get("tag")}' for param in self.params_list
         ]
         self.ch1_param_cb = QComboBox()
         self.ch3_param_cb = QComboBox()

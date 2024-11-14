@@ -121,7 +121,7 @@ class TestSetupView(QWidget):
 
     def set_header_info(self):
         self.header_info_label.setText(
-            f"Grupo: {self.data["group"]} | Modelo: {self.data["model"]} | Cliente: {self.data["customer"]}"
+            f'Grupo: {self.data["group"]} | Modelo: {self.data["model"]} | Cliente: {self.data["customer"]}'
         )
 
     def set_input_radio_buttons(self) -> None:
